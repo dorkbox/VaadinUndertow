@@ -28,8 +28,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.channels.sendBlocking
-import kotlinx.coroutines.sync.Mutex
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 
 val ACTOR = AttachmentKey.create<SendChannel<HttpServerExchange>>(SendChannel::class.java)!!
@@ -45,9 +46,18 @@ class CoroutineHttpWrapper(private val sessionCookieName: String, private val ca
 
     private lateinit var defaultActor: SendChannel<HttpServerExchange>
 
-    private val scope = CoroutineScope(Dispatchers.Default)
+    // Our UI Needs to run on a different thread pool so that if the UI is blocked, it doesn't block our cache.
+    private val uiThreadPool = Executors.newCachedThreadPool(DaemonThreadFactory("HttpWrapper")) as ExecutorService
+    private val uiDispatcher = uiThreadPool.asCoroutineDispatcher()
+
+    private val handler = CoroutineExceptionHandler { _, exception ->
+        logger.error { "Uncaught Coroutine Error: $exception" }
+    }
+
+
+    private val scope = CoroutineScope(uiDispatcher + handler)
     val job = Job()
-    val mutex = Mutex()
+//    val mutex = Mutex()
 
     @kotlinx.coroutines.ObsoleteCoroutinesApi
     private fun createActor(handler: HttpHandler) = scope.actor<HttpServerExchange>(context = job, capacity = capacity) {
