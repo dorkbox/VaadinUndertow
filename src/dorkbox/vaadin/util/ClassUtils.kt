@@ -212,10 +212,6 @@ object ClassUtils {
         }
     }
 
-
-
-
-
     /**
      * Resolve the given class name as primitive class, if appropriate,
      * according to the JVM's naming rules for primitive classes.
@@ -251,7 +247,6 @@ object ClassUtils {
      * @see java.lang.reflect.Proxy.getProxyClass
      */
     // on JDK 9
-    @JvmStatic
     fun createCompositeInterface(interfaces: Array<Class<*>?>, classLoader: ClassLoader?): Class<*> {
         return Proxy.getProxyClass(classLoader, *interfaces)
     }
