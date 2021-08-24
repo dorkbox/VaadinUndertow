@@ -20,7 +20,6 @@ import io.undertow.UndertowMessages
 import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
-import mu.KLogger
 import mu.KotlinLogging
 
 class ResourceCollectionManager(private val resources: List<ResourceManager>) : ResourceManager {
@@ -58,7 +57,7 @@ class ResourceCollectionManager(private val resources: List<ResourceManager>) : 
                 resourceManager.removeResourceChangeListener(listener)
             }
         } else {
-            throw UndertowMessages.MESSAGES.resourceChangeListenerNotSupported();
+            throw UndertowMessages.MESSAGES.resourceChangeListenerNotSupported()
         }
     }
 
@@ -69,7 +68,7 @@ class ResourceCollectionManager(private val resources: List<ResourceManager>) : 
                 resourceManager.registerResourceChangeListener(listener)
             }
         }  else {
-            throw UndertowMessages.MESSAGES.resourceChangeListenerNotSupported();
+            throw UndertowMessages.MESSAGES.resourceChangeListenerNotSupported()
         }
     }
 
