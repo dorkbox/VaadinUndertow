@@ -9,6 +9,9 @@ import elemental.json.JsonObject
 import elemental.json.impl.JsonUtil
 import io.github.classgraph.ClassGraph
 import io.github.classgraph.ScanResult
+import io.undertow.Undertow
+import io.undertow.UndertowMessages
+import io.undertow.UndertowOptions
 import io.undertow.server.HttpHandler
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.handlers.cache.CacheHandler
@@ -18,16 +21,22 @@ import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.servlet.Servlets
 import io.undertow.servlet.api.ServletContainerInitializerInfo
+import io.undertow.servlet.api.ServletInfo
 import io.undertow.servlet.api.ServletSessionConfig
 import io.undertow.websockets.jsr.WebSocketDeploymentInfo
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
+import org.xnio.Xnio
+import org.xnio.XnioWorker
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
 import java.util.*
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import javax.servlet.Servlet
 import javax.servlet.ServletContainerInitializer
 import javax.servlet.SessionTrackingMode
 import javax.servlet.annotation.HandlesTypes
@@ -36,7 +45,7 @@ import kotlin.reflect.KClass
 /**
  * Loads, Configures, and Starts a Vaadin 14 application
  */
-class VaadinApplication(runningAsJar: Boolean) {
+class VaadinApplication() {
     companion object {
         /**
          * Gets the version number.
@@ -49,6 +58,7 @@ class VaadinApplication(runningAsJar: Boolean) {
         }
     }
 
+    val runningAsJar = this.javaClass.getResource("").protocol == "jar"
     private val logger = KotlinLogging.logger {}
     val tempDir: File = File(System.getProperty("java.io.tmpdir", "tmpDir"), "undertow").absoluteFile
 
@@ -67,6 +77,9 @@ class VaadinApplication(runningAsJar: Boolean) {
 
     private lateinit var cacheHandler: HttpHandler
     private lateinit var servletHttpHandler: HttpHandler
+
+    @Volatile
+    private var undertowServer: Undertow? = null
 
     init {
         // find the config/stats.json to see what mode (PRODUCTION or DEV) we should run in.
@@ -150,7 +163,7 @@ class VaadinApplication(runningAsJar: Boolean) {
     }
 
     @Suppress("DuplicatedCode")
-    fun initializeResources(runningAsJar: Boolean) {
+    fun initResources() {
         val metaInfResources = "META-INF/resources"
 
         // resource locations are tricky...
@@ -368,13 +381,12 @@ class VaadinApplication(runningAsJar: Boolean) {
         // TODO: runtime GZ compression of resources!?! only necessary in the JAR run mode (which is what runs on servers)
     }
 
-    fun shutdown() {
-        onStopList.forEach {
-            it.run()
-        }
-    }
+    fun initServlet(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int,
+                    servletClass: Class<out Servlet> = VaadinServlet::class.java,
+                    servletConfig: ServletInfo.() -> Unit = {},
+                    undertowConfig: Undertow.Builder.() -> Unit) {
 
-    fun start(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int) {
+
         resourceCollectionManager = ResourceCollectionManager(resources)
 
         val conditionalResourceManager =
@@ -396,6 +408,28 @@ class VaadinApplication(runningAsJar: Boolean) {
             conditionalResourceManager.close()
         })
 
+
+        val servlet = Servlets.servlet("VaadinServlet", servletClass)
+            .setLoadOnStartup(1)
+            .setAsyncSupported(true)
+            .setExecutor(null) // we use coroutines!
+            .addInitParam("productionMode", (!devMode).toString()) // this is set via the gradle build
+
+            // have to say where our NPM/dev mode files live.
+            .addInitParam(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
+
+            // have to say where our token file lives
+            .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
+
+            // where our stats.json file lives. This loads via classloader, not via a file!!
+            .addInitParam(Constants.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
+
+            .addInitParam("enable-websockets", "true")
+            .addMapping("/*")
+
+        // setup (or change) custom config options (
+        servletConfig(servlet)
+
         val servletBuilder = Servlets.deployment()
                 .setClassLoader(urlClassLoader)
                 .setResourceManager(conditionalResourceManager)
@@ -404,25 +438,7 @@ class VaadinApplication(runningAsJar: Boolean) {
                 .setSecurityDisabled(true) // security is controlled in memory using vaadin
                 .setContextPath("/") // root context path
                 .setDeploymentName("Vaadin")
-                .addServlets(
-                        Servlets.servlet("VaadinServlet", VaadinServlet::class.java)
-                                .setLoadOnStartup(1)
-                                .setAsyncSupported(true)
-                                .setExecutor(null) // we use coroutines!
-                                .addInitParam("productionMode", (!devMode).toString()) // this is set via the gradle build
-
-                                // have to say where our NPM/dev mode files live.
-                                .addInitParam(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
-
-                                // have to say where our token file lives
-                                .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
-
-                                // where our stats.json file lives. This loads via classloader, not via a file!!
-                                .addInitParam(Constants.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
-
-                                .addInitParam("enable-websockets", "true")
-                                .addMapping("/*")
-                )
+                .addServlets(servlet)
                 .setSessionPersistenceManager(FileSessionPersistence(tempDir))
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME, WebSocketDeploymentInfo())
 
@@ -481,7 +497,13 @@ class VaadinApplication(runningAsJar: Boolean) {
         /////////////////////////////////////////////////////////////////
         val manager = Servlets.defaultContainer().addDeployment(servletBuilder)
         manager.deploy()
+
+        // TODO: adjust the session timeout (default is 30 minutes) from when the LAST heartbeat is detected
+        // manager.deployment.sessionManager.setDefaultSessionTimeout(TimeUnit.MINUTES.toSeconds(Args.webserver.sessionTimeout).toInt())
         servletHttpHandler = manager.start()
+
+
+
 
 
         // NOTE: look into SessionRestoringHandler to keep session state across re-deploys (this is normally not used in production). this might just be tricks with classloaders to keep sessions around
@@ -533,6 +555,27 @@ class VaadinApplication(runningAsJar: Boolean) {
                 staticResourceHandler
             }
         }
+
+
+        val serverBuilder: Undertow.Builder = Undertow.builder()
+            // Max 1 because we immediately hand off to a coroutine handler
+            .setWorkerThreads(1)
+            .setSocketOption(org.xnio.Options.BACKLOG, 10000)
+
+            // Let the server workers have time to close when we shutdown
+            .setServerOption(UndertowOptions.SHUTDOWN_TIMEOUT, 10000)
+
+            .setSocketOption(org.xnio.Options.REUSE_ADDRESSES, true)
+
+            // In HTTP/1.1, connections are persistent unless declared otherwise.
+            // Adding a "Connection: keep-alive" header to every response would only add useless bytes.
+            .setServerOption(UndertowOptions.SSL_USER_CIPHER_SUITES_ORDER, true)
+            .setServerOption(UndertowOptions.ENABLE_STATISTICS, false)
+
+        // configure or override options
+        undertowConfig(serverBuilder)
+
+        undertowServer = serverBuilder.build()
     }
 
     fun handleRequest(exchange: HttpServerExchange) {
@@ -550,6 +593,13 @@ class VaadinApplication(runningAsJar: Boolean) {
 
         prefixResources.forEach {
             if (path.startsWith(it)) {
+                if (it == "/VAADIN" &&
+                    // Dynamic resources need to be handled by the default handler, not the cacheHandler.
+                    path[8] == 'd' && path[9] == 'y' && path[10] == 'n') {
+                        servletHttpHandler.handleRequest(exchange)
+                        return
+                }
+
                 cacheHandler.handleRequest(exchange)
                 return
             }
@@ -558,88 +608,75 @@ class VaadinApplication(runningAsJar: Boolean) {
         // this is the default, and will use coroutines + servlet to handle the request
         servletHttpHandler.handleRequest(exchange)
     }
-//
-//    fun startServer(logger: Logger) {
-//        // always show this part.
-//        val webLogger = logger as ch.qos.logback.classic.Logger
-//
-//        // save the logger level, so that on startup we can see more detailed info, if necessary.
-//        val level = webLogger.level
-//        if (logger.isTraceEnabled) {
-//            webLogger.level = Level.TRACE
-//        }
-//        else {
-//            webLogger.level = Level.INFO
-//        }
-//
-//        val server = serverBuilder.build()
-//        try {
-//            // NOTE: we start this in a NEW THREAD so we can create and use a thread-group for all of the undertow threads created. This allows
-//            //  us to keep our main thread group "un-cluttered" when analyzing thread/stack traces.
-//            //
-//            //  This is a hacky, but undertow does not support setting the thread group in the builder.
-//
-//            val exceptionThrown = AtomicReference<Exception>()
-//            val latch = CountDownLatch(1)
-//
-//            Thread(threadGroup) {
-//                try {
-//                    server.start()
-//                    webServer = server
-//
-//                    WebServerConfig.logStartup(logger)
-//
-//                    extraStartables.forEach { it ->
-//                        it.run()
-//                    }
-//                } catch (e: Exception) {
-//                    exceptionThrown.set(e)
-//                } finally {
-//                    latch.countDown()
-//                }
-//            }.start()
-//
-//            latch.await()
-//
-//            val exception = exceptionThrown.get()
-//            if (exception != null) {
-//                throw exception
-//            }
-//        }
-//        finally {
-//            webLogger.level = level
-//        }
-//    }
-//
-//
-//    fun stopServer(logger: Logger) {
-//        // always show this part.
-//        val webLogger = logger as ch.qos.logback.classic.Logger
-//        val undertowLogger = LoggerFactory.getLogger("org.xnio.nio") as ch.qos.logback.classic.Logger
-//
-//        // save the logger level, so that on shutdown we can see more detailed info, if necessary.
-//        val level = webLogger.level
-//        val undertowLevel = undertowLogger.level
-//        if (logger.isTraceEnabled) {
-//            webLogger.level = Level.TRACE
-//            undertowLogger.level = Level.TRACE
-//        }
-//        else {
-//            // we REALLY don't care about shutdown errors. we are shutting down!! (atmosphere likes to screw with us!)
-//            webLogger.level = Level.OFF
-//            undertowLogger.level = Level.OFF
-//        }
-//
-//        try {
-//            webServer?.stop()
-//
-//            extraStoppables.forEach { it ->
-//                it.run()
-//            }
-//        }
-//        finally {
-//            webLogger.level = level
-//            undertowLogger.level = undertowLevel
-//        }
-//    }
+
+
+
+    ////
+    ////
+    //// undertow server specific methods
+    ////
+    ////
+
+
+    val xnio: Xnio?
+        get() {
+            return undertowServer?.xnio
+        }
+
+    val worker: XnioWorker?
+        get() {
+            return undertowServer?.worker
+        }
+
+    val listenerInfo: MutableList<Undertow.ListenerInfo>
+        get() {
+            return undertowServer?.listenerInfo ?: throw UndertowMessages.MESSAGES.serverNotStarted()
+        }
+
+    fun start() {
+        val threadGroup = ThreadGroup("Undertow Web Server")
+
+        // NOTE: we start this in a NEW THREAD so we can create and use a thread-group for all of the undertow threads created. This allows
+        //  us to keep our main thread group "un-cluttered" when analyzing thread/stack traces.
+        //
+        //  This is a hacky, but undertow does not support setting the thread group in the builder.
+
+        val exceptionThrown = AtomicReference<Exception>()
+        val latch = CountDownLatch(1)
+
+        Thread(threadGroup) {
+            try {
+                undertowServer?.start()
+            } catch (e: Exception) {
+                exceptionThrown.set(e)
+            } finally {
+                latch.countDown()
+            }
+        }.start()
+
+        latch.await()
+
+        val exception = exceptionThrown.get()
+        if (exception != null) {
+            throw exception
+        }
+    }
+
+    fun stop() {
+        try {
+
+            // servletBridge.shutdown();
+            // serverChannel.close().awaitUninterruptibly();
+            // bootstrap.releaseExternalResources();
+            //                servletWebapp.destroy()
+            //                allChannels.close().awaitUninterruptibly()
+
+            worker?.shutdown() // maybe?
+            undertowServer?.stop()
+        } finally {
+            onStopList.forEach {
+                it.run()
+            }
+        }
+    }
 }
