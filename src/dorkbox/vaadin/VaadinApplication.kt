@@ -4,6 +4,7 @@ import com.vaadin.flow.server.Constants
 import com.vaadin.flow.server.VaadinServlet
 import com.vaadin.flow.server.frontend.FrontendUtils
 import dorkbox.vaadin.undertow.*
+import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import elemental.json.JsonObject
 import elemental.json.impl.JsonUtil
@@ -58,7 +59,7 @@ class VaadinApplication() {
         }
     }
 
-    val runningAsJar = this.javaClass.getResource("").protocol == "jar"
+    val runningAsJar: Boolean
     private val logger = KotlinLogging.logger {}
     val tempDir: File = File(System.getProperty("java.io.tmpdir", "tmpDir"), "undertow").absoluteFile
 
@@ -82,6 +83,10 @@ class VaadinApplication() {
     private var undertowServer: Undertow? = null
 
     init {
+        // THIS code might be as a jar, however we want to test if the **TOP** leve; code that called this is running as a jar.
+        runningAsJar = CallingClass.get().getResource("")!!.protocol == "jar"
+
+
         // find the config/stats.json to see what mode (PRODUCTION or DEV) we should run in.
         // we COULD just check the existence of this file...
         //   HOWEVER if we are testing a different configuration from our IDE, this method will not work...
