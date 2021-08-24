@@ -37,39 +37,107 @@ import java.util.*
 object ClassUtils {
     /** Suffix for array class names: `"[]"`.  */
     const val ARRAY_SUFFIX = "[]"
+
     /** Prefix for internal array class names: `"["`.  */
     private const val INTERNAL_ARRAY_PREFIX = "["
+
     /** Prefix for internal non-primitive array class names: `"[L"`.  */
     private const val NON_PRIMITIVE_ARRAY_PREFIX = "[L"
+
     /** The package separator character: `'.'`.  */
     private const val PACKAGE_SEPARATOR = '.'
+
     /** The inner class separator character: `'$'`.  */
     private const val INNER_CLASS_SEPARATOR = '$'
+
     /**
      * Map with primitive wrapper type as key and corresponding primitive
      * type as value, for example: Integer.class -> int.class.
      */
     private val primitiveWrapperTypeMap: MutableMap<Class<*>, Class<*>?> = IdentityHashMap(8)
+
     /**
      * Map with primitive type as key and corresponding wrapper
      * type as value, for example: int.class -> Integer.class.
      */
     private val primitiveTypeToWrapperMap: MutableMap<Class<*>, Class<*>> = IdentityHashMap(8)
+
     /**
      * Map with primitive type name as key and corresponding primitive
      * type as value, for example: "int" -> "int.class".
      */
     private val primitiveTypeNameMap: MutableMap<String, Class<*>> = HashMap(32)
+
     /**
      * Map with common Java language class name as key and corresponding Class as value.
      * Primarily for efficient deserialization of remote invocations.
      */
     private val commonClassCache: MutableMap<String, Class<*>> = HashMap(64)
+
     /**
      * Common Java language interfaces which are supposed to be ignored
      * when searching for 'primary' user-level interfaces.
      */
     private var javaLanguageInterfaces: Set<Class<*>>? = null
+
+
+    init {
+        primitiveWrapperTypeMap[Boolean::class.java] = Boolean::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Byte::class.java] = Byte::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Char::class.java] = Char::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Double::class.java] = Double::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Float::class.java] = Float::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Int::class.java] = Int::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Long::class.java] = Long::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Short::class.java] = Short::class.javaPrimitiveType
+        primitiveWrapperTypeMap[Void::class.java] = Void.TYPE
+
+        // Map entry iteration is less expensive to initialize than forEach with lambdas
+        for ((key, value) in primitiveWrapperTypeMap) {
+            primitiveTypeToWrapperMap[value as Class<*>] = key
+            registerCommonClasses(key)
+        }
+
+
+        val primitiveTypes = mutableSetOf<Class<*>>()
+        @Suppress("UNCHECKED_CAST")
+        primitiveTypes.addAll(primitiveWrapperTypeMap.values as Collection<Class<*>>)
+
+        Collections.addAll(primitiveTypes, BooleanArray::class.java, ByteArray::class.java, CharArray::class.java,
+            DoubleArray::class.java, FloatArray::class.java, IntArray::class.java, LongArray::class.java, ShortArray::class.java)
+        primitiveTypes.add(Void.TYPE)
+        for (primitiveType in primitiveTypes) {
+            primitiveTypeNameMap[primitiveType.name] = primitiveType
+        }
+
+
+        registerCommonClasses(Array<Boolean>::class.java, Array<Byte>::class.java, Array<Char>::class.java, Array<Double>::class.java,
+            Array<Float>::class.java, Array<Int>::class.java, Array<Long>::class.java, Array<Short>::class.java)
+        registerCommonClasses(Number::class.java, Array<Number>::class.java, String::class.java, Array<String>::class.java,
+            Class::class.java, emptyArray<Class<*>>().javaClass, Any::class.java, Array<Any>::class.java)
+
+        registerCommonClasses(Throwable::class.java, Exception::class.java, RuntimeException::class.java,
+            Error::class.java, StackTraceElement::class.java, Array<StackTraceElement>::class.java)
+        registerCommonClasses(Enum::class.java, Iterable::class.java, MutableIterator::class.java, Enumeration::class.java,
+            MutableCollection::class.java, MutableList::class.java, MutableSet::class.java, MutableMap::class.java, MutableMap.MutableEntry::class.java, Optional::class.java)
+
+        val javaLanguageInterfaceArray = arrayOf(
+            Serializable::class.java, Externalizable::class.java,
+            Closeable::class.java, AutoCloseable::class.java, Cloneable::class.java, Comparable::class.java)
+        registerCommonClasses(*javaLanguageInterfaceArray)
+
+        javaLanguageInterfaces = HashSet(listOf(*javaLanguageInterfaceArray))
+    }
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Register the given common classes with the ClassUtils cache.
@@ -93,9 +161,8 @@ object ClassUtils {
      * @throws LinkageError if the class file could not be loaded
      * @see Class.forName
      */
-    @JvmStatic
     @Throws(ClassNotFoundException::class, LinkageError::class)
-    fun forName(name: String, classLoader: ClassLoader?): Class<*> {
+    fun forName(name: String, classLoader: ClassLoader? = null): Class<*> {
         var clazz = resolvePrimitiveClassName(name)
         if (clazz == null) {
             clazz = commonClassCache[name]
@@ -187,51 +254,5 @@ object ClassUtils {
     @JvmStatic
     fun createCompositeInterface(interfaces: Array<Class<*>?>, classLoader: ClassLoader?): Class<*> {
         return Proxy.getProxyClass(classLoader, *interfaces)
-    }
-
-
-
-    init {
-        primitiveWrapperTypeMap[Boolean::class.java] = Boolean::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Byte::class.java] = Byte::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Char::class.java] = Char::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Double::class.java] = Double::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Float::class.java] = Float::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Int::class.java] = Int::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Long::class.java] = Long::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Short::class.java] = Short::class.javaPrimitiveType
-        primitiveWrapperTypeMap[Void::class.java] = Void.TYPE
-
-        // Map entry iteration is less expensive to initialize than forEach with lambdas
-        for ((key, value) in primitiveWrapperTypeMap) {
-            primitiveTypeToWrapperMap[value as Class<*>] = key
-            registerCommonClasses(key)
-        }
-
-
-        val primitiveTypes = mutableSetOf<Class<*>>()
-        @Suppress("UNCHECKED_CAST")
-        primitiveTypes.addAll(primitiveWrapperTypeMap.values as Collection<Class<*>>)
-
-        Collections.addAll(primitiveTypes, BooleanArray::class.java, ByteArray::class.java, CharArray::class.java,
-                DoubleArray::class.java, FloatArray::class.java, IntArray::class.java, LongArray::class.java, ShortArray::class.java)
-        primitiveTypes.add(Void.TYPE)
-        for (primitiveType in primitiveTypes) {
-            primitiveTypeNameMap[primitiveType.getName()] = primitiveType
-        }
-        registerCommonClasses(Array<Boolean>::class.java, Array<Byte>::class.java, Array<Char>::class.java, Array<Double>::class.java,
-                Array<Float>::class.java, Array<Int>::class.java, Array<Long>::class.java, Array<Short>::class.java)
-        registerCommonClasses(Number::class.java, Array<Number>::class.java, String::class.java, Array<String>::class.java,
-                Class::class.java, emptyArray<Class<*>>().javaClass, Any::class.java, Array<Any>::class.java)
-
-        registerCommonClasses(Throwable::class.java, Exception::class.java, RuntimeException::class.java,
-                Error::class.java, StackTraceElement::class.java, Array<StackTraceElement>::class.java)
-        registerCommonClasses(Enum::class.java, Iterable::class.java, MutableIterator::class.java, Enumeration::class.java,
-                MutableCollection::class.java, MutableList::class.java, MutableSet::class.java, MutableMap::class.java, MutableMap.MutableEntry::class.java, Optional::class.java)
-
-        val javaLanguageInterfaceArray = arrayOf(Serializable::class.java, Externalizable::class.java,
-                Closeable::class.java, AutoCloseable::class.java, Cloneable::class.java, Comparable::class.java)
-        registerCommonClasses(*javaLanguageInterfaceArray)
-        javaLanguageInterfaces = HashSet(Arrays.asList(*javaLanguageInterfaceArray))
     }
 }
