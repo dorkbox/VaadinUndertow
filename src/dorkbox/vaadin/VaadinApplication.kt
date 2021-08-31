@@ -1,6 +1,7 @@
 package dorkbox.vaadin
 
 import com.vaadin.flow.server.Constants
+import com.vaadin.flow.server.InitParameters
 import com.vaadin.flow.server.VaadinServlet
 import com.vaadin.flow.server.frontend.FrontendUtils
 import dorkbox.vaadin.undertow.*
@@ -67,6 +68,7 @@ class VaadinApplication() {
 
     val devMode: Boolean
     private val tokenFileName: String
+    val pNpmEnabled: Boolean
 
     private lateinit var urlClassLoader: URLClassLoader
     private lateinit var resourceCollectionManager: ResourceCollectionManager
@@ -120,13 +122,14 @@ class VaadinApplication() {
             }
         }
 
-        if (tokenFileName.isEmpty() || tokenJson == null || !tokenJson.hasKey(Constants.SERVLET_PARAMETER_PRODUCTION_MODE)) {
+        if (tokenFileName.isEmpty() || tokenJson == null || !tokenJson.hasKey(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)) {
             // this is a problem! we must configure the system first via gradle!
             throw java.lang.RuntimeException("Unable to continue! Error reading token!" +
                     "You must FIRST compile the vaadin resources for DEV or PRODUCTION mode!")
         }
 
-        devMode = !tokenJson.getBoolean(Constants.SERVLET_PARAMETER_PRODUCTION_MODE)
+        devMode = !tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)
+        pNpmEnabled = tokenJson.getBoolean("pnpm.enabled") // matches gradle build script
 
         if (devMode && runningAsJar) {
             throw RuntimeException("Invalid run configuration. It is not possible to run DEV MODE from a deployed jar.\n" +
@@ -134,7 +137,7 @@ class VaadinApplication() {
         }
 
         // we are ALWAYS running in full Vaadin14 mode
-        System.setProperty(Constants.VAADIN_PREFIX + Constants.SERVLET_PARAMETER_COMPATIBILITY_MODE, "false")
+        System.setProperty(Constants.VAADIN_PREFIX + InitParameters.SERVLET_PARAMETER_COMPATIBILITY_MODE, "false")
 
         if (devMode) {
             // set the location of our frontend dir + generated dir when in dev mode
@@ -191,13 +194,13 @@ class VaadinApplication() {
 
         val scanResultJarDependencies = ClassGraph()
                 .filterClasspathElements { it.endsWith(".jar") }
-                .whitelistPaths(metaInfResources)
+                .acceptPaths(metaInfResources)
                 .scan()
 
 
         val scanResultLocalDependencies =  ClassGraph()
                 .filterClasspathElements { !it.endsWith(".jar") }
-                .whitelistPaths(metaInfResources)
+                .acceptPaths(metaInfResources)
                 .scan()
 
 
@@ -427,7 +430,7 @@ class VaadinApplication() {
             .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
 
             // where our stats.json file lives. This loads via classloader, not via a file!!
-            .addInitParam(Constants.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
+            .addInitParam(InitParameters.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
 
             .addInitParam("enable-websockets", "true")
             .addMapping("/*")
