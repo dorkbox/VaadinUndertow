@@ -248,6 +248,7 @@ object ClassUtils {
      */
     // on JDK 9
     fun createCompositeInterface(interfaces: Array<Class<*>?>, classLoader: ClassLoader?): Class<*> {
+        @Suppress("DEPRECATION")
         return Proxy.getProxyClass(classLoader, *interfaces)
     }
 }
