@@ -129,7 +129,7 @@ class VaadinApplication() {
         }
 
         devMode = !tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)
-        pNpmEnabled = tokenJson.getBoolean("pnpm.enabled") // matches gradle build script
+        pNpmEnabled = tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_ENABLE_PNPM)
 
         if (devMode && runningAsJar) {
             throw RuntimeException("Invalid run configuration. It is not possible to run DEV MODE from a deployed jar.\n" +
@@ -391,6 +391,7 @@ class VaadinApplication() {
 
     fun initServlet(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int,
                     servletClass: Class<out Servlet> = VaadinServlet::class.java,
+                    servletName: String = "Vaadin",
                     servletConfig: ServletInfo.() -> Unit = {},
                     undertowConfig: Undertow.Builder.() -> Unit) {
 
@@ -417,7 +418,7 @@ class VaadinApplication() {
         })
 
 
-        val servlet = Servlets.servlet("VaadinServlet", servletClass)
+        val servlet = Servlets.servlet(servletName, servletClass)
             .setLoadOnStartup(1)
             .setAsyncSupported(true)
             .setExecutor(null) // we use coroutines!
@@ -435,20 +436,22 @@ class VaadinApplication() {
             .addInitParam("enable-websockets", "true")
             .addMapping("/*")
 
+
         // setup (or change) custom config options (
         servletConfig(servlet)
 
         val servletBuilder = Servlets.deployment()
                 .setClassLoader(urlClassLoader)
                 .setResourceManager(conditionalResourceManager)
-                .setDisplayName("Vaadin")
+                .setDisplayName(servletName)
                 .setDefaultEncoding("UTF-8")
                 .setSecurityDisabled(true) // security is controlled in memory using vaadin
                 .setContextPath("/") // root context path
-                .setDeploymentName("Vaadin")
+                .setDeploymentName(servletName)
                 .addServlets(servlet)
                 .setSessionPersistenceManager(FileSessionPersistence(tempDir))
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME, WebSocketDeploymentInfo())
+            .addServletContainerInitializers(listOf())
 
         val sessionCookieName = ServletSessionConfig.DEFAULT_SESSION_ID
 
@@ -494,7 +497,17 @@ class VaadinApplication() {
                 }
 
                 if (classSet.isNotEmpty()) {
-                    servletBuilder.addServletContainerInitializer(ServletContainerInitializerInfo(javaClass, classSet))
+                    if (javaClass == com.vaadin.flow.server.startup.DevModeInitializer::class.java) {
+                        if (devMode) {
+                            // instead of the default, we load **OUR** dev-mode initializer.
+                            // The vaadin one is super buggy for custom environments
+                            servletBuilder.addServletContainerInitializer(
+                                ServletContainerInitializerInfo(dorkbox.vaadin.DevModeInitializer::class.java, classSet))
+                        }
+                    } else {
+                        // do not load the dev-mode initializer for production mode
+                        servletBuilder.addServletContainerInitializer(ServletContainerInitializerInfo(javaClass, classSet))
+                    }
                 }
             }
         }
