@@ -4,6 +4,7 @@ import com.vaadin.flow.server.Constants
 import com.vaadin.flow.server.InitParameters
 import com.vaadin.flow.server.VaadinServlet
 import com.vaadin.flow.server.frontend.FrontendUtils
+import dorkbox.vaadin.devMode.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
@@ -502,7 +503,7 @@ class VaadinApplication() {
                             // instead of the default, we load **OUR** dev-mode initializer.
                             // The vaadin one is super buggy for custom environments
                             servletBuilder.addServletContainerInitializer(
-                                ServletContainerInitializerInfo(dorkbox.vaadin.DevModeInitializer::class.java, classSet))
+                                ServletContainerInitializerInfo(DevModeInitializer::class.java, classSet))
                         }
                     } else {
                         // do not load the dev-mode initializer for production mode

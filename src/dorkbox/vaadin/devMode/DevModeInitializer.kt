@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package dorkbox.vaadin
+package dorkbox.vaadin.devMode
 
 import com.vaadin.flow.component.WebComponentExporter
 import com.vaadin.flow.component.WebComponentExporterFactory
@@ -44,7 +44,6 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.Executor
@@ -63,6 +62,8 @@ import javax.servlet.annotation.WebListener
  * The initial commit is exactly as-is from vaadin.
  *
  * This file is NOT extensible/configurable AT-ALL, so this is required...
+ *
+ *
  *
  *
  * Servlet initializer starting node updaters as well as the webpack-dev-mode
@@ -140,13 +141,14 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                 return
             }
 
-
-            val baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, null) ?: baseDirectoryFallback
+            // these are BOTH set by VaadinApplication.kt
+            val baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
             val generatedDir = System.getProperty(FrontendUtils.PARAM_GENERATED_DIR, FrontendUtils.DEFAULT_GENERATED_DIR)
-
             val frontendFolder = config.getStringProperty(
                 FrontendUtils.PARAM_FRONTEND_DIR,
                 System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
+
+
 
             val builder = NodeTasks.Builder(DevModeClassFinder(classes), File(baseDir), File(generatedDir), File(frontendFolder))
 
@@ -248,35 +250,6 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
         private fun log(): Logger {
             return LoggerFactory.getLogger(DevModeInitializer::class.java)
         }
-
-        /*
-         * Accept user.dir or cwd as a fallback only if the directory seems to be a
-         * Maven or Gradle project. Check to avoid cluttering server directories
-         * (see tickets #8249, #8403).
-         */
-        private val baseDirectoryFallback: String
-            get() {
-                val baseDirCandidate = System.getProperty("user.dir", ".")
-                val path = Paths.get(baseDirCandidate)
-                return if (path.toFile().isDirectory
-                    && (path.resolve("pom.xml").toFile().exists()
-                            || path.resolve("build.gradle").toFile().exists())
-                ) {
-                    path.toString()
-                } else {
-                    throw IllegalStateException(
-                        String.format(
-                            "Failed to determine project directory for dev mode. "
-                                    + "Directory '%s' does not look like a Maven or "
-                                    + "Gradle project. Ensure that you have run the "
-                                    + "prepare-frontend Maven goal, which generates "
-                                    + "'flow-build-info.json', prior to deploying your "
-                                    + "application",
-                            path.toString()
-                        )
-                    )
-                }
-            }
 
         /*
          * This method returns all folders of jar files having files in the

@@ -1,9 +1,18 @@
-package dorkbox.vaadin
+package dorkbox.vaadin.devMode
 
 import com.vaadin.flow.server.frontend.scanner.ClassFinder
 import java.util.*
 import javax.servlet.annotation.HandlesTypes
 
+/**
+ * THIS IS COPIED DIRECTLY FROM VAADIN 14.6.8 (flow 2.4.6)
+ *
+ * CHANGES FROM DEFAULT ARE MANAGED AS DIFFERENT REVISIONS.
+ *
+ * The initial commit is exactly as-is from vaadin.
+ *
+ * This file is NOT extensible/configurable AT-ALL, so this is required...
+ */
 internal class DevModeClassFinder(classes: Set<Class<*>?>?) : ClassFinder.DefaultClassFinder(classes) {
         companion object {
             private val APPLICABLE_CLASS_NAMES = Collections.unmodifiableSet(calculateApplicableClassNames())

@@ -1,0 +1,129 @@
+/*
+ * Copyright 2000-2020 Vaadin Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+package dorkbox.vaadin.devMode;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * THIS IS COPIED DIRECTLY FROM VAADIN 14.6.8 (flow 2.4.6)
+ *
+ * CHANGES FROM DEFAULT ARE MANAGED AS DIFFERENT REVISIONS.
+ *
+ * The initial commit is exactly as-is from vaadin.
+ *
+ * This file is NOT extensible/configurable AT-ALL, so this is required...
+ *
+ *
+ *
+ *
+ * Opens a server socket which is supposed to be opened until dev mode is active
+ * inside JVM.
+ * <p>
+ * If this socket is closed then there is no anymore Java "client" for the
+ * webpack dev server and it should be stopped.
+ *
+ * @author Vaadin Ltd
+ * @since 2.0
+ */
+class DevServerWatchDog {
+
+    private static class WatchDogServer implements Runnable {
+
+        private final ServerSocket server;
+
+        WatchDogServer() {
+            try {
+                server = new ServerSocket(0);
+                server.setSoTimeout(0);
+                if (getLogger().isDebugEnabled()) {
+                    getLogger().debug("Watchdog server has started on port {}",
+                            server.getLocalPort());
+                }
+            } catch (IOException e) {
+                throw new RuntimeException("Could not open a server socket", e);
+            }
+        }
+
+        @Override
+        public void run() {
+            while (!server.isClosed()) {
+                try {
+                    Socket accept = server.accept();
+                    accept.setSoTimeout(0);
+                    enterReloadMessageReadLoop(accept);
+                } catch (IOException e) {
+                    getLogger().debug(
+                            "Error occurred during accept a connection", e);
+                }
+            }
+        }
+
+        void stop() {
+            if (server != null) {
+                try {
+                    server.close();
+                } catch (IOException e) {
+                    getLogger().debug(
+                            "Error occurred during close the server socket", e);
+                }
+            }
+        }
+
+        private Logger getLogger() {
+            return LoggerFactory.getLogger(WatchDogServer.class);
+        }
+
+        private void enterReloadMessageReadLoop(Socket accept) throws IOException{
+            BufferedReader in = new BufferedReader(new InputStreamReader(
+                    accept.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            while ((line = in.readLine()) != null) {
+                DevModeHandler devModeHandler = DevModeHandler
+                        .getDevModeHandler();
+                if ("reload".equals(line) && devModeHandler != null
+                        && devModeHandler.getLiveReload() != null) {
+                    devModeHandler.getLiveReload().reload();
+                }
+            }
+        }
+    }
+
+    private final WatchDogServer watchDogServer;
+
+    DevServerWatchDog() {
+        watchDogServer = new WatchDogServer();
+
+        Thread serverThread = new Thread(watchDogServer);
+        serverThread.setDaemon(true);
+        serverThread.start();
+    }
+
+    int getWatchDogPort() {
+        return watchDogServer.server.getLocalPort();
+    }
+
+    void stop() {
+        watchDogServer.stop();
+    }
+}
