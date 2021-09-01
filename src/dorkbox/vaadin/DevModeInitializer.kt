@@ -13,89 +13,51 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package dorkbox.vaadin;
+package dorkbox.vaadin
 
-import static com.vaadin.flow.server.Constants.PACKAGE_JSON;
-import static com.vaadin.flow.server.InitParameters.SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE;
-import static com.vaadin.flow.server.frontend.FrontendUtils.DEFAULT_FRONTEND_DIR;
-import static com.vaadin.flow.server.frontend.FrontendUtils.DEFAULT_GENERATED_DIR;
-import static com.vaadin.flow.server.frontend.FrontendUtils.PARAM_FRONTEND_DIR;
-import static com.vaadin.flow.server.frontend.FrontendUtils.PARAM_GENERATED_DIR;
-import static com.vaadin.flow.server.frontend.FrontendUtils.WEBPACK_GENERATED;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
-import java.io.UncheckedIOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executor;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
-
-import javax.servlet.ServletContext;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-import javax.servlet.annotation.HandlesTypes;
-import javax.servlet.annotation.WebListener;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.vaadin.flow.component.WebComponentExporter;
-import com.vaadin.flow.component.WebComponentExporterFactory;
-import com.vaadin.flow.component.dependency.CssImport;
-import com.vaadin.flow.component.dependency.JavaScript;
-import com.vaadin.flow.component.dependency.JsModule;
-import com.vaadin.flow.component.dependency.NpmPackage;
-import com.vaadin.flow.function.DeploymentConfiguration;
-import com.vaadin.flow.router.HasErrorParameter;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.Constants;
-import com.vaadin.flow.server.DevModeHandler;
-import com.vaadin.flow.server.ExecutionFailedException;
-import com.vaadin.flow.server.InitParameters;
-import com.vaadin.flow.server.UIInitListener;
-import com.vaadin.flow.server.VaadinContext;
-import com.vaadin.flow.server.VaadinServiceInitListener;
-import com.vaadin.flow.server.VaadinServlet;
-import com.vaadin.flow.server.VaadinServletContext;
-import com.vaadin.flow.server.frontend.FallbackChunk;
-import com.vaadin.flow.server.frontend.FrontendUtils;
-import com.vaadin.flow.server.frontend.NodeTasks;
-import com.vaadin.flow.server.frontend.NodeTasks.Builder;
-import com.vaadin.flow.server.frontend.scanner.ClassFinder.DefaultClassFinder;
-import com.vaadin.flow.server.startup.ClassLoaderAwareServletContainerInitializer;
-import com.vaadin.flow.server.startup.ServletDeployer.StubServletConfig;
-import com.vaadin.flow.theme.NoTheme;
-import com.vaadin.flow.theme.Theme;
-
-import elemental.json.Json;
-import elemental.json.JsonObject;
+import com.vaadin.flow.component.WebComponentExporter
+import com.vaadin.flow.component.WebComponentExporterFactory
+import com.vaadin.flow.component.dependency.CssImport
+import com.vaadin.flow.component.dependency.JavaScript
+import com.vaadin.flow.component.dependency.JsModule
+import com.vaadin.flow.component.dependency.NpmPackage
+import com.vaadin.flow.function.DeploymentConfiguration
+import com.vaadin.flow.router.HasErrorParameter
+import com.vaadin.flow.router.Route
+import com.vaadin.flow.server.*
+import com.vaadin.flow.server.frontend.FrontendUtils
+import com.vaadin.flow.server.frontend.NodeTasks
+import com.vaadin.flow.server.frontend.scanner.ClassFinder.DefaultClassFinder
+import com.vaadin.flow.server.startup.ClassLoaderAwareServletContainerInitializer
+import com.vaadin.flow.server.startup.ServletDeployer.StubServletConfig
+import com.vaadin.flow.theme.NoTheme
+import com.vaadin.flow.theme.Theme
+import elemental.json.Json
+import elemental.json.JsonObject
+import org.apache.commons.io.FileUtils
+import org.apache.commons.io.IOUtils
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.io.*
+import java.lang.reflect.InvocationTargetException
+import java.net.URL
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import java.util.concurrent.Executor
+import java.util.regex.Pattern
+import java.util.stream.Collectors
+import java.util.stream.Stream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import javax.servlet.*
+import javax.servlet.annotation.HandlesTypes
+import javax.servlet.annotation.WebListener
 
 /**
  * THIS IS COPIED DIRECTLY FROM VAADIN 14.6.8 (flow 2.4.6)
@@ -112,483 +74,453 @@ import elemental.json.JsonObject;
  *
  * @since 2.0
  */
-@HandlesTypes({Route.class, UIInitListener.class,
-               VaadinServiceInitListener.class, WebComponentExporter.class,
-               WebComponentExporterFactory.class, NpmPackage.class,
-               NpmPackage.Container.class, JsModule.class, JsModule.Container.class,
-               CssImport.class, CssImport.Container.class, JavaScript.class,
-               JavaScript.Container.class, Theme.class, NoTheme.class,
-               HasErrorParameter.class })
+@HandlesTypes(
+    Route::class,
+    UIInitListener::class,
+    VaadinServiceInitListener::class,
+    WebComponentExporter::class,
+    WebComponentExporterFactory::class,
+    NpmPackage::class,
+    NpmPackage.Container::class,
+    JsModule::class,
+    JsModule.Container::class,
+    CssImport::class,
+    CssImport.Container::class,
+    JavaScript::class,
+    JavaScript.Container::class,
+    Theme::class,
+    NoTheme::class,
+    HasErrorParameter::class
+)
 @WebListener
-public class DevModeInitializer
-        implements ClassLoaderAwareServletContainerInitializer, Serializable,
-                   ServletContextListener {
+class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializable, ServletContextListener {
+    internal class DevModeClassFinder(classes: Set<Class<*>?>?) : DefaultClassFinder(classes) {
+        companion object {
+            private val APPLICABLE_CLASS_NAMES = Collections.unmodifiableSet(calculateApplicableClassNames())
 
-    static class DevModeClassFinder extends DefaultClassFinder {
-
-        private static final Set<String> APPLICABLE_CLASS_NAMES = Collections
-                .unmodifiableSet(calculateApplicableClassNames());
-
-        public DevModeClassFinder(Set<Class<?>> classes) {
-            super(classes);
+            private fun calculateApplicableClassNames(): Set<String> {
+                val handlesTypes: HandlesTypes = DevModeInitializer::class.java.getAnnotation(HandlesTypes::class.java)
+                val values: Array<Class<Any>> = handlesTypes.value.map { (it as Any).javaClass }.toTypedArray()
+                return Stream.of<Class<*>>(*values).map { obj: Class<*> -> obj.name }
+                    .collect(Collectors.toSet())
+            }
         }
 
-        @Override
-        public Set<Class<?>> getAnnotatedClasses(
-                Class<? extends Annotation> annotation) {
-            ensureImplementation(annotation);
-            return super.getAnnotatedClasses(annotation);
+        override fun getAnnotatedClasses(annotation: Class<out Annotation?>): Set<Class<*>> {
+            ensureImplementation(annotation)
+            return super.getAnnotatedClasses(annotation)
         }
 
-        @Override
-        public <T> Set<Class<? extends T>> getSubTypesOf(Class<T> type) {
-            ensureImplementation(type);
-            return super.getSubTypesOf(type);
+        override fun <T> getSubTypesOf(type: Class<T>): Set<Class<out T>> {
+            ensureImplementation(type)
+            return super.getSubTypesOf(type)
         }
 
-        private void ensureImplementation(Class<?> clazz) {
-            if (!APPLICABLE_CLASS_NAMES.contains(clazz.getName())) {
-                throw new IllegalArgumentException("Unexpected class name "
+        private fun ensureImplementation(clazz: Class<*>) {
+            require(APPLICABLE_CLASS_NAMES.contains(clazz.name)) {
+                ("Unexpected class name "
                         + clazz + ". Implementation error: the class finder "
                         + "instance is not aware of this class. "
                         + "Fix @HandlesTypes annotation value for "
-                        + DevModeInitializer.class.getName());
+                        + DevModeInitializer::class.java.name)
             }
-        }
-
-        private static Set<String> calculateApplicableClassNames() {
-            HandlesTypes handlesTypes = DevModeInitializer.class
-                    .getAnnotation(HandlesTypes.class);
-            return Stream.of(handlesTypes.value()).map(Class::getName)
-                    .collect(Collectors.toSet());
         }
     }
 
-    private static final Pattern JAR_FILE_REGEX = Pattern
-            .compile(".*file:(.+\\.jar).*");
+    @Throws(ServletException::class)
+    override fun process(classes: Set<Class<*>?>?, context: ServletContext) {
+        val registrations: Collection<ServletRegistration> = context.servletRegistrations.values
+        var vaadinServletRegistration: ServletRegistration? = null
 
-    // Path of jar files in a URL with zip protocol doesn't start with "zip:"
-    // nor "file:". It contains only the path of the file.
-    // Weblogic uses zip protocol.
-    private static final Pattern ZIP_PROTOCOL_JAR_FILE_REGEX = Pattern
-            .compile("(.+\\.jar).*");
-
-    private static final Pattern VFS_FILE_REGEX = Pattern
-            .compile("(vfs:/.+\\.jar).*");
-
-    private static final Pattern VFS_DIRECTORY_REGEX = Pattern
-            .compile("vfs:/.+");
-
-    // allow trailing slash
-    private static final Pattern DIR_REGEX_FRONTEND_DEFAULT = Pattern.compile(
-            "^(?:file:0)?(.+)" + Constants.RESOURCES_FRONTEND_DEFAULT + "/?$");
-
-    // allow trailing slash
-    private static final Pattern DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT = Pattern
-            .compile("^(?:file:)?(.+)"
-                    + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
-                    + "/?$");
-
-    @Override
-    public void process(Set<Class<?>> classes, ServletContext context)
-            throws ServletException {
-        Collection<? extends ServletRegistration> registrations = context
-                .getServletRegistrations().values();
-
-        ServletRegistration vaadinServletRegistration = null;
-        for (ServletRegistration registration : registrations) {
+        for (registration in registrations) {
             try {
-                if (registration.getClassName() != null
-                        && isVaadinServletSubClass(
-                                registration.getClassName())) {
-                    vaadinServletRegistration = registration;
-                    break;
+                if (registration.className != null && isVaadinServletSubClass(registration.className)) {
+                    vaadinServletRegistration = registration
+                    break
                 }
-            } catch (ClassNotFoundException e) {
-                throw new ServletException(
-                        String.format("Servlet class name (%s) can't be found!",
-                                registration.getClassName()),
-                        e);
+            } catch (e: ClassNotFoundException) {
+                throw ServletException(
+                    String.format(
+                        "Servlet class name (%s) can't be found!",
+                        registration.className
+                    ),
+                    e
+                )
             }
         }
 
-        DeploymentConfiguration config;
-        if (vaadinServletRegistration != null) {
-            config = StubServletConfig.createDeploymentConfiguration(context,
-                    vaadinServletRegistration, VaadinServlet.class);
+        val config = if (vaadinServletRegistration != null) {
+            StubServletConfig.createDeploymentConfiguration(context, vaadinServletRegistration, VaadinServlet::class.java)
         } else {
-            config = StubServletConfig.createDeploymentConfiguration(context,
-                    VaadinServlet.class);
+            StubServletConfig.createDeploymentConfiguration(context, VaadinServlet::class.java)
         }
-
-        initDevModeHandler(classes, context, config);
+        initDevModeHandler(classes, context, config)
     }
 
-    private boolean isVaadinServletSubClass(String className)
-            throws ClassNotFoundException {
-        return VaadinServlet.class.isAssignableFrom(Class.forName(className));
+    @Throws(ClassNotFoundException::class)
+    private fun isVaadinServletSubClass(className: String): Boolean {
+        return VaadinServlet::class.java.isAssignableFrom(Class.forName(className))
     }
 
-    /**
-     * Initialize the devmode server if not in production mode or compatibility
-     * mode.
-     *
-     * @param classes
-     *            classes to check for npm- and js modules
-     * @param context
-     *            servlet context we are running in
-     * @param config
-     *            deployment configuration
-     *
-     * @throws ServletException
-     *             if dev mode can't be initialized
-     */
-    public static void initDevModeHandler(Set<Class<?>> classes,
-            ServletContext context, DeploymentConfiguration config)
-            throws ServletException {
-        if (config.isProductionMode()) {
-            log().debug("Skipping DEV MODE because PRODUCTION MODE is set.");
-            return;
+    override fun contextInitialized(ctx: ServletContextEvent) {
+        // No need to do anything on init
+    }
+
+    override fun contextDestroyed(ctx: ServletContextEvent) {
+        val handler = DevModeHandler.getDevModeHandler()
+        if (handler != null && !handler.reuseDevServer()) {
+            handler.stop()
         }
-        if (config.isCompatibilityMode()) {
-            log().debug("Skipping DEV MODE because BOWER MODE is set.");
-            return;
-        }
-        if (!config.enableDevServer()) {
-            log().debug(
-                    "Skipping DEV MODE because dev server shouldn't be enabled.");
-            return;
-        }
+    }
 
-        String baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR,
-                null);
-        if (baseDir == null) {
-            baseDir = getBaseDirectoryFallback();
-        }
+    companion object {
+        private val JAR_FILE_REGEX = Pattern.compile(".*file:(.+\\.jar).*")
 
-        String generatedDir = System.getProperty(PARAM_GENERATED_DIR,
-                DEFAULT_GENERATED_DIR);
-        String frontendFolder = config.getStringProperty(PARAM_FRONTEND_DIR,
-                System.getProperty(PARAM_FRONTEND_DIR, DEFAULT_FRONTEND_DIR));
+        // Path of jar files in a URL with zip protocol doesn't start with "zip:"
+        // nor "file:". It contains only the path of the file.
+        // Weblogic uses zip protocol.
+        private val ZIP_PROTOCOL_JAR_FILE_REGEX = Pattern.compile("(.+\\.jar).*")
+        private val VFS_FILE_REGEX = Pattern.compile("(vfs:/.+\\.jar).*")
+        private val VFS_DIRECTORY_REGEX = Pattern.compile("vfs:/.+")
 
-        Builder builder = new Builder(new DevModeClassFinder(classes),
-                new File(baseDir), new File(generatedDir),
-                new File(frontendFolder));
+        // allow trailing slash
+        private val DIR_REGEX_FRONTEND_DEFAULT = Pattern.compile("^(?:file:0)?(.+)" + Constants.RESOURCES_FRONTEND_DEFAULT + "/?$")
 
-        log().info("Starting dev-mode updaters in {} folder.",
-                builder.npmFolder);
+        // allow trailing slash
+        private val DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT = Pattern.compile(
+                "^(?:file:)?(.+)"
+                        + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
+                        + "/?$"
+            )
 
-        if (!builder.generatedFolder.exists()) {
-            try {
-                FileUtils.forceMkdir(builder.generatedFolder);
-            } catch (IOException e) {
-                throw new UncheckedIOException(
-                        String.format("Failed to create directory '%s'",
-                                builder.generatedFolder),
-                        e);
+        /**
+         * Initialize the devmode server if not in production mode or compatibility
+         * mode.
+         *
+         * @param classes
+         * classes to check for npm- and js modules
+         * @param context
+         * servlet context we are running in
+         * @param config
+         * deployment configuration
+         *
+         * @throws ServletException
+         * if dev mode can't be initialized
+         */
+        @Throws(ServletException::class)
+        fun initDevModeHandler(classes: Set<Class<*>?>?, context: ServletContext?, config: DeploymentConfiguration) {
+            System.err.println("CUSTOM INIT!")
+            if (config.isProductionMode) {
+                log().debug("Skipping DEV MODE because PRODUCTION MODE is set.")
+                return
             }
-        }
+            if (config.isCompatibilityMode) {
+                log().debug("Skipping DEV MODE because BOWER MODE is set.")
+                return
+            }
+            if (!config.enableDevServer()) {
+                log().debug("Skipping DEV MODE because dev server shouldn't be enabled.")
+                return
+            }
 
-        File generatedPackages = new File(builder.generatedFolder,
-                PACKAGE_JSON);
 
-        // If we are missing the generated webpack configuration then generate
-        // webpack configurations
-        if (!new File(builder.npmFolder, WEBPACK_GENERATED).exists()) {
-            builder.withWebpack(builder.npmFolder, FrontendUtils.WEBPACK_CONFIG,
-                    FrontendUtils.WEBPACK_GENERATED);
-        }
+            val baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, null) ?: baseDirectoryFallback
+            val generatedDir = System.getProperty(FrontendUtils.PARAM_GENERATED_DIR, FrontendUtils.DEFAULT_GENERATED_DIR)
 
-        // If we are missing either the base or generated package json files
-        // generate those
-        if (!new File(builder.npmFolder, PACKAGE_JSON).exists()
-                || !generatedPackages.exists()) {
-            builder.createMissingPackageJson(true);
-        }
+            val frontendFolder = config.getStringProperty(FrontendUtils.PARAM_FRONTEND_DIR,
+                    System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
 
-        Set<File> frontendLocations = getFrontendLocationsFromClassloader(
-                DevModeInitializer.class.getClassLoader());
+            val builder = NodeTasks.Builder(DevModeClassFinder(classes), File(baseDir), File(generatedDir), File(frontendFolder))
 
-        boolean useByteCodeScanner = config.getBooleanProperty(
-                SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE,
-                Boolean.parseBoolean(System.getProperty(
-                        SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE,
-                        Boolean.FALSE.toString())));
+            log().info("Starting dev-mode updaters in {} folder.", builder.npmFolder)
+            if (!builder.generatedFolder.exists()) {
+                try {
+                    FileUtils.forceMkdir(builder.generatedFolder)
+                } catch (e: IOException) {
+                    throw UncheckedIOException(
+                        String.format(
+                            "Failed to create directory '%s'",
+                            builder.generatedFolder
+                        ),
+                        e
+                    )
+                }
+            }
+            val generatedPackages = File(builder.generatedFolder, Constants.PACKAGE_JSON)
 
-        boolean enablePnpm = config.isPnpmEnabled();
+            // If we are missing the generated webpack configuration then generate
+            // webpack configurations
+            if (!File(builder.npmFolder, FrontendUtils.WEBPACK_GENERATED).exists()) {
+                builder.withWebpack(builder.npmFolder, FrontendUtils.WEBPACK_CONFIG, FrontendUtils.WEBPACK_GENERATED)
+            }
 
-        boolean useHomeNodeExec = config.getBooleanProperty(
-                InitParameters.REQUIRE_HOME_NODE_EXECUTABLE, false);
+            // If we are missing either the base or generated package json files
+            // generate those
+            if (!File(builder.npmFolder, Constants.PACKAGE_JSON).exists() || !generatedPackages.exists()) {
+                builder.createMissingPackageJson(true)
+            }
 
-        VaadinContext vaadinContext = new VaadinServletContext(context);
-        JsonObject tokenFileData = Json.createObject();
-        try {
-            builder.enablePackagesUpdate(true)
+            val frontendLocations = getFrontendLocationsFromClassloader(DevModeInitializer::class.java.classLoader)
+            val useByteCodeScanner = config.getBooleanProperty(
+                InitParameters.SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE,
+                java.lang.Boolean.parseBoolean(
+                    System.getProperty(
+                        InitParameters.SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE,
+                        java.lang.Boolean.FALSE.toString()
+                    )
+                )
+            )
+
+            val enablePnpm = config.isPnpmEnabled
+            val useHomeNodeExec = config.getBooleanProperty(InitParameters.REQUIRE_HOME_NODE_EXECUTABLE, false)
+            val vaadinContext: VaadinContext = VaadinServletContext(context)
+            val tokenFileData = Json.createObject()
+
+            try {
+                builder.enablePackagesUpdate(true)
                     .useByteCodeScanner(useByteCodeScanner)
                     .copyResources(frontendLocations)
-                    .copyLocalResources(new File(baseDir,
-                            Constants.LOCAL_FRONTEND_RESOURCES_PATH))
+                    .copyLocalResources(File(baseDir, Constants.LOCAL_FRONTEND_RESOURCES_PATH))
                     .enableImportsUpdate(true).runNpmInstall(true)
                     .populateTokenFileData(tokenFileData)
                     .withEmbeddableWebComponents(true).enablePnpm(enablePnpm)
                     .withHomeNodeExecRequired(useHomeNodeExec).build()
-                    .execute();
+                    .execute()
 
-            FallbackChunk chunk = FrontendUtils
-                    .readFallbackChunk(tokenFileData);
-            if (chunk != null) {
-                vaadinContext.setAttribute(chunk);
+                val chunk = FrontendUtils.readFallbackChunk(tokenFileData)
+                if (chunk != null) {
+                    vaadinContext.setAttribute(chunk)
+                }
+            } catch (exception: ExecutionFailedException) {
+                log().debug("Could not initialize dev mode handler. One of the node tasks failed", exception)
+                throw ServletException(exception)
             }
-        } catch (ExecutionFailedException exception) {
-            log().debug(
-                    "Could not initialize dev mode handler. One of the node tasks failed",
-                    exception);
-            throw new ServletException(exception);
-        }
-
-        NodeTasks tasks = builder.enablePackagesUpdate(true)
+            val tasks = builder.enablePackagesUpdate(true)
                 .useByteCodeScanner(useByteCodeScanner)
                 .copyResources(frontendLocations)
-                .copyLocalResources(new File(baseDir,
-                        Constants.LOCAL_FRONTEND_RESOURCES_PATH))
+                .copyLocalResources(File(baseDir, Constants.LOCAL_FRONTEND_RESOURCES_PATH))
                 .enableImportsUpdate(true).runNpmInstall(true)
                 .populateTokenFileData(tokenFileData)
                 .withEmbeddableWebComponents(true).enablePnpm(enablePnpm)
-                .withHomeNodeExecRequired(useHomeNodeExec).build();
+                .withHomeNodeExecRequired(useHomeNodeExec).build()
 
-        // Check whether executor is provided by the caller (framework)
-        Object service = config.getInitParameters().get(Executor.class);
-
-        Runnable runnable = () -> runNodeTasks(vaadinContext, tokenFileData,
-                tasks);
-
-        CompletableFuture<Void> nodeTasksFuture;
-        if (service instanceof Executor) {
-            // if there is an executor use it to run the task
-            nodeTasksFuture = CompletableFuture.runAsync(runnable,
-                    (Executor) service);
-        } else {
-            nodeTasksFuture = CompletableFuture.runAsync(runnable);
-
-        }
-
-        DevModeHandler.start(config, builder.npmFolder, nodeTasksFuture);
-    }
-
-    private static Logger log() {
-        return LoggerFactory.getLogger(DevModeInitializer.class);
-    }
-
-    @Override
-    public void contextInitialized(ServletContextEvent ctx) {
-        // No need to do anything on init
-    }
-
-    @Override
-    public void contextDestroyed(ServletContextEvent ctx) {
-        DevModeHandler handler = DevModeHandler.getDevModeHandler();
-        if (handler != null && !handler.reuseDevServer()) {
-            handler.stop();
-        }
-    }
-
-    /*
-     * Accept user.dir or cwd as a fallback only if the directory seems to be a
-     * Maven or Gradle project. Check to avoid cluttering server directories
-     * (see tickets #8249, #8403).
-     */
-    private static String getBaseDirectoryFallback() {
-        String baseDirCandidate = System.getProperty("user.dir", ".");
-        Path path = Paths.get(baseDirCandidate);
-        if (path.toFile().isDirectory()
-                && (path.resolve("pom.xml").toFile().exists()
-                        || path.resolve("build.gradle").toFile().exists())) {
-            return path.toString();
-        } else {
-            throw new IllegalStateException(String.format(
-                    "Failed to determine project directory for dev mode. "
-                            + "Directory '%s' does not look like a Maven or "
-                            + "Gradle project. Ensure that you have run the "
-                            + "prepare-frontend Maven goal, which generates "
-                            + "'flow-build-info.json', prior to deploying your "
-                            + "application",
-                    path.toString()));
-        }
-    }
-
-    /*
-     * This method returns all folders of jar files having files in the
-     * META-INF/resources/frontend folder. We don't use URLClassLoader because
-     * will fail in Java 9+
-     */
-    static Set<File> getFrontendLocationsFromClassloader(
-            ClassLoader classLoader) throws ServletException {
-        Set<File> frontendFiles = new HashSet<>();
-        frontendFiles.addAll(getFrontendLocationsFromClassloader(classLoader,
-                Constants.RESOURCES_FRONTEND_DEFAULT));
-        frontendFiles.addAll(getFrontendLocationsFromClassloader(classLoader,
-                Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT));
-        return frontendFiles;
-    }
-
-    private static void runNodeTasks(VaadinContext vaadinContext,
-            JsonObject tokenFileData, NodeTasks tasks) {
-        try {
-            tasks.execute();
-
-            FallbackChunk chunk = FrontendUtils
-                    .readFallbackChunk(tokenFileData);
-            if (chunk != null) {
-                vaadinContext.setAttribute(chunk);
+            // Check whether executor is provided by the caller (framework)
+            val service = config.initParameters[Executor::class.java]
+            val runnable = Runnable {
+                runNodeTasks(
+                    vaadinContext, tokenFileData,
+                    tasks
+                )
             }
-        } catch (ExecutionFailedException exception) {
-            log().debug(
-                    "Could not initialize dev mode handler. One of the node tasks failed",
-                    exception);
-            throw new CompletionException(exception);
-        }
-    }
 
-    private static Set<File> getFrontendLocationsFromClassloader(
-            ClassLoader classLoader, String resourcesFolder)
-            throws ServletException {
-        Set<File> frontendFiles = new HashSet<>();
-        try {
-            Enumeration<URL> en = classLoader.getResources(resourcesFolder);
-            if (en == null) {
-                return frontendFiles;
+            val nodeTasksFuture =
+            if (service is Executor) {
+                // if there is an executor use it to run the task
+                CompletableFuture.runAsync(
+                    runnable,
+                    service as Executor?
+                )
+            } else {
+                CompletableFuture.runAsync(runnable)
             }
-            Set<String> vfsJars = new HashSet<>();
-            while (en.hasMoreElements()) {
-                URL url = en.nextElement();
-                String urlString = url.toString();
 
-                String path = URLDecoder.decode(url.getPath(),
-                        StandardCharsets.UTF_8.name());
-                Matcher jarMatcher = JAR_FILE_REGEX.matcher(path);
-                Matcher zipProtocolJarMatcher = ZIP_PROTOCOL_JAR_FILE_REGEX
-                        .matcher(path);
-                Matcher dirMatcher = DIR_REGEX_FRONTEND_DEFAULT.matcher(path);
-                Matcher dirCompatibilityMatcher = DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT
-                        .matcher(path);
-                Matcher jarVfsMatcher = VFS_FILE_REGEX.matcher(urlString);
-                Matcher dirVfsMatcher = VFS_DIRECTORY_REGEX.matcher(urlString);
-                if (jarVfsMatcher.find()) {
-                    String vfsJar = jarVfsMatcher.group(1);
-                    if (vfsJars.add(vfsJar))
-                        frontendFiles.add(
-                                getPhysicalFileOfJBossVfsJar(new URL(vfsJar)));
-                } else if (dirVfsMatcher.find()) {
-                    URL vfsDirUrl = new URL(urlString.substring(0,
-                            urlString.lastIndexOf(resourcesFolder)));
-                    frontendFiles
-                            .add(getPhysicalFileOfJBossVfsDirectory(vfsDirUrl));
-                } else if (jarMatcher.find()) {
-                    frontendFiles.add(new File(jarMatcher.group(1)));
-                } else if ("zip".equalsIgnoreCase(url.getProtocol())
-                        && zipProtocolJarMatcher.find()) {
-                    frontendFiles.add(new File(zipProtocolJarMatcher.group(1)));
-                } else if (dirMatcher.find()) {
-                    frontendFiles.add(new File(dirMatcher.group(1)));
-                } else if (dirCompatibilityMatcher.find()) {
-                    frontendFiles
-                            .add(new File(dirCompatibilityMatcher.group(1)));
+            DevModeHandler.start(config, builder.npmFolder, nodeTasksFuture)
+        }
+
+        private fun log(): Logger {
+            return LoggerFactory.getLogger(DevModeInitializer::class.java)
+        }
+
+        /*
+         * Accept user.dir or cwd as a fallback only if the directory seems to be a
+         * Maven or Gradle project. Check to avoid cluttering server directories
+         * (see tickets #8249, #8403).
+         */
+        private val baseDirectoryFallback: String
+            private get() {
+                val baseDirCandidate = System.getProperty("user.dir", ".")
+                val path = Paths.get(baseDirCandidate)
+                return if (path.toFile().isDirectory
+                    && (path.resolve("pom.xml").toFile().exists()
+                            || path.resolve("build.gradle").toFile().exists())
+                ) {
+                    path.toString()
                 } else {
-                    log().warn(
-                            "Resource {} not visited because does not meet supported formats.",
-                            url.getPath());
+                    throw IllegalStateException(
+                        String.format(
+                            "Failed to determine project directory for dev mode. "
+                                    + "Directory '%s' does not look like a Maven or "
+                                    + "Gradle project. Ensure that you have run the "
+                                    + "prepare-frontend Maven goal, which generates "
+                                    + "'flow-build-info.json', prior to deploying your "
+                                    + "application",
+                            path.toString()
+                        )
+                    )
                 }
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+
+        /*
+         * This method returns all folders of jar files having files in the
+         * META-INF/resources/frontend folder. We don't use URLClassLoader because
+         * will fail in Java 9+
+         */
+        @Throws(ServletException::class)
+        fun getFrontendLocationsFromClassloader(classLoader: ClassLoader): Set<File> {
+            val frontendFiles: MutableSet<File> = HashSet()
+            frontendFiles.addAll(
+                getFrontendLocationsFromClassloader(
+                    classLoader,
+                    Constants.RESOURCES_FRONTEND_DEFAULT
+                )
+            )
+            frontendFiles.addAll(
+                getFrontendLocationsFromClassloader(
+                    classLoader,
+                    Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
+                )
+            )
+            return frontendFiles
         }
 
-        return frontendFiles;
-    }
 
-    private static File getPhysicalFileOfJBossVfsDirectory(URL url)
-            throws IOException, ServletException {
-        try {
-            Object virtualFile = url.openConnection().getContent();
-            Class virtualFileClass = virtualFile.getClass();
-
-            // Reflection as we cannot afford a dependency to WildFly or JBoss
-            Method getChildrenRecursivelyMethod = virtualFileClass
-                    .getMethod("getChildrenRecursively");
-            Method getPhysicalFileMethod = virtualFileClass
-                    .getMethod("getPhysicalFile");
-
-            // By calling getPhysicalFile, we make sure that the corresponding
-            // physical files/directories of the root directory and its children
-            // are created. Later, these physical files are scanned to collect
-            // their resources.
-            List virtualFiles = (List) getChildrenRecursivelyMethod
-                    .invoke(virtualFile);
-            File rootDirectory = (File) getPhysicalFileMethod
-                    .invoke(virtualFile);
-            for (Object child : virtualFiles) {
-                // side effect: create real-world files
-                getPhysicalFileMethod.invoke(child);
+        private fun runNodeTasks(vaadinContext: VaadinContext, tokenFileData: JsonObject, tasks: NodeTasks) {
+            try {
+                tasks.execute()
+                val chunk = FrontendUtils.readFallbackChunk(tokenFileData)
+                if (chunk != null) {
+                    vaadinContext.setAttribute(chunk)
+                }
+            } catch (exception: ExecutionFailedException) {
+                log().debug("Could not initialize dev mode handler. One of the node tasks failed", exception)
+                throw CompletionException(exception)
             }
-            return rootDirectory;
-        } catch (NoSuchMethodException | IllegalAccessException
-                | InvocationTargetException exc) {
-            throw new ServletException("Failed to invoke JBoss VFS API.", exc);
         }
-    }
 
-    private static File getPhysicalFileOfJBossVfsJar(URL url)
-            throws IOException, ServletException {
-        try {
-            Object jarVirtualFile = url.openConnection().getContent();
+        @Throws(ServletException::class)
+        private fun getFrontendLocationsFromClassloader(classLoader: ClassLoader, resourcesFolder: String): Set<File> {
+            val frontendFiles: MutableSet<File> = HashSet()
+            try {
+                val en = classLoader.getResources(resourcesFolder) ?: return frontendFiles
+                val vfsJars: MutableSet<String> = HashSet()
+                while (en.hasMoreElements()) {
+                    val url = en.nextElement()
+                    val urlString = url.toString()
+                    val path = URLDecoder.decode(url.path, StandardCharsets.UTF_8.name())
 
-            // Creating a temporary jar file out of the vfs files
-            String vfsJarPath = url.toString();
-            String fileNamePrefix = vfsJarPath.substring(
-                    vfsJarPath.lastIndexOf('/') + 1,
-                    vfsJarPath.lastIndexOf(".jar"));
-            Path tempJar = Files.createTempFile(fileNamePrefix, ".jar");
+                    val jarMatcher = JAR_FILE_REGEX.matcher(path)
+                    val zipProtocolJarMatcher = ZIP_PROTOCOL_JAR_FILE_REGEX.matcher(path)
+                    val dirMatcher = DIR_REGEX_FRONTEND_DEFAULT.matcher(path)
+                    val dirCompatibilityMatcher = DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT.matcher(path)
+                    val jarVfsMatcher = VFS_FILE_REGEX.matcher(urlString)
+                    val dirVfsMatcher = VFS_DIRECTORY_REGEX.matcher(urlString)
 
-            generateJarFromJBossVfsFolder(jarVirtualFile, tempJar);
-
-            File tempJarFile = tempJar.toFile();
-            tempJarFile.deleteOnExit();
-            return tempJarFile;
-        } catch (NoSuchMethodException | IllegalAccessException
-                | InvocationTargetException exc) {
-            throw new ServletException("Failed to invoke JBoss VFS API.", exc);
+                    if (jarVfsMatcher.find()) {
+                        val vfsJar = jarVfsMatcher.group(1)
+                        if (vfsJars.add(vfsJar)) frontendFiles.add(
+                            getPhysicalFileOfJBossVfsJar(URL(vfsJar))
+                        )
+                    } else if (dirVfsMatcher.find()) {
+                        val vfsDirUrl = URL(
+                            urlString.substring(0,urlString.lastIndexOf(resourcesFolder)
+                            )
+                        )
+                        frontendFiles.add(getPhysicalFileOfJBossVfsDirectory(vfsDirUrl))
+                    } else if (jarMatcher.find()) {
+                        frontendFiles.add(File(jarMatcher.group(1)))
+                    } else if ("zip".equals(url.protocol, ignoreCase = true) && zipProtocolJarMatcher.find()
+                    ) {
+                        frontendFiles.add(File(zipProtocolJarMatcher.group(1)))
+                    } else if (dirMatcher.find()) {
+                        frontendFiles.add(File(dirMatcher.group(1)))
+                    } else if (dirCompatibilityMatcher.find()) {
+                        frontendFiles.add(File(dirCompatibilityMatcher.group(1)))
+                    } else {
+                        log().warn("Resource {} not visited because does not meet supported formats.", url.path)
+                    }
+                }
+            } catch (e: IOException) {
+                throw UncheckedIOException(e)
+            }
+            return frontendFiles
         }
-    }
 
-    private static void generateJarFromJBossVfsFolder(Object jarVirtualFile,
-            Path tempJar) throws IOException, IllegalAccessException,
-            InvocationTargetException, NoSuchMethodException {
-        // We should use reflection to use JBoss VFS API as we cannot afford a
-        // dependency to WildFly or JBoss
-        Class virtualFileClass = jarVirtualFile.getClass();
-        Method getChildrenRecursivelyMethod = virtualFileClass
-                .getMethod("getChildrenRecursively");
-        Method openStreamMethod = virtualFileClass.getMethod("openStream");
-        Method isFileMethod = virtualFileClass.getMethod("isFile");
-        Method getPathNameRelativeToMethod = virtualFileClass
-                .getMethod("getPathNameRelativeTo", virtualFileClass);
+        @Throws(IOException::class, ServletException::class)
+        private fun getPhysicalFileOfJBossVfsDirectory(url: URL): File {
+            return try {
+                val virtualFile = url.openConnection().content
+                val virtualFileClass: Class<*> = virtualFile.javaClass
 
-        List jarVirtualChildren = (List) getChildrenRecursivelyMethod
-                .invoke(jarVirtualFile);
-        try (ZipOutputStream zipOutputStream = new ZipOutputStream(
-                Files.newOutputStream(tempJar))) {
-            for (Object child : jarVirtualChildren) {
-                if (!(Boolean) isFileMethod.invoke(child))
-                    continue;
+                // Reflection as we cannot afford a dependency to WildFly or JBoss
+                val getChildrenRecursivelyMethod = virtualFileClass.getMethod("getChildrenRecursively")
+                val getPhysicalFileMethod = virtualFileClass.getMethod("getPhysicalFile")
 
-                String relativePath = (String) getPathNameRelativeToMethod
-                        .invoke(child, jarVirtualFile);
-                InputStream inputStream = (InputStream) openStreamMethod
-                        .invoke(child);
-                ZipEntry zipEntry = new ZipEntry(relativePath);
-                zipOutputStream.putNextEntry(zipEntry);
-                IOUtils.copy(inputStream, zipOutputStream);
-                zipOutputStream.closeEntry();
+                // By calling getPhysicalFile, we make sure that the corresponding
+                // physical files/directories of the root directory and its children
+                // are created. Later, these physical files are scanned to collect
+                // their resources.
+                val virtualFiles = getChildrenRecursivelyMethod.invoke(virtualFile) as List<*>
+                val rootDirectory = getPhysicalFileMethod.invoke(virtualFile) as File
+                for (child in virtualFiles) {
+                    // side effect: create real-world files
+                    getPhysicalFileMethod.invoke(child)
+                }
+                rootDirectory
+            } catch (exc: NoSuchMethodException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            } catch (exc: IllegalAccessException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            } catch (exc: InvocationTargetException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            }
+        }
+
+        @Throws(IOException::class, ServletException::class)
+        private fun getPhysicalFileOfJBossVfsJar(url: URL): File {
+            return try {
+                val jarVirtualFile = url.openConnection().content
+
+                // Creating a temporary jar file out of the vfs files
+                val vfsJarPath = url.toString()
+                val fileNamePrefix = vfsJarPath.substring(vfsJarPath.lastIndexOf('/') + 1, vfsJarPath.lastIndexOf(".jar"))
+                val tempJar = Files.createTempFile(fileNamePrefix, ".jar")
+                generateJarFromJBossVfsFolder(jarVirtualFile, tempJar)
+
+                val tempJarFile = tempJar.toFile()
+                tempJarFile.deleteOnExit()
+                tempJarFile
+            } catch (exc: NoSuchMethodException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            } catch (exc: IllegalAccessException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            } catch (exc: InvocationTargetException) {
+                throw ServletException("Failed to invoke JBoss VFS API.", exc)
+            }
+        }
+
+        @Throws(IOException::class, IllegalAccessException::class, InvocationTargetException::class, NoSuchMethodException::class)
+        private fun generateJarFromJBossVfsFolder(jarVirtualFile: Any, tempJar: Path) {
+            // We should use reflection to use JBoss VFS API as we cannot afford a
+            // dependency to WildFly or JBoss
+            val virtualFileClass: Class<*> = jarVirtualFile.javaClass
+            val getChildrenRecursivelyMethod = virtualFileClass.getMethod("getChildrenRecursively")
+            val openStreamMethod = virtualFileClass.getMethod("openStream")
+            val isFileMethod = virtualFileClass.getMethod("isFile")
+            val getPathNameRelativeToMethod = virtualFileClass.getMethod("getPathNameRelativeTo", virtualFileClass)
+            val jarVirtualChildren = getChildrenRecursivelyMethod.invoke(jarVirtualFile) as List<*>
+            ZipOutputStream(Files.newOutputStream(tempJar)).use { zipOutputStream ->
+                for (child in jarVirtualChildren) {
+                    if (!(isFileMethod.invoke(child) as Boolean)) continue
+
+                    val relativePath = getPathNameRelativeToMethod.invoke(child, jarVirtualFile) as String
+
+                    val inputStream = openStreamMethod.invoke(child) as InputStream
+
+                    val zipEntry = ZipEntry(relativePath)
+                    zipOutputStream.putNextEntry(zipEntry)
+                    IOUtils.copy(inputStream, zipOutputStream)
+                    zipOutputStream.closeEntry()
+                }
             }
         }
     }
