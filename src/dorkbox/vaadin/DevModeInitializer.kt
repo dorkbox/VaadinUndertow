@@ -27,7 +27,6 @@ import com.vaadin.flow.router.Route
 import com.vaadin.flow.server.*
 import com.vaadin.flow.server.frontend.FrontendUtils
 import com.vaadin.flow.server.frontend.NodeTasks
-import com.vaadin.flow.server.frontend.scanner.ClassFinder.DefaultClassFinder
 import com.vaadin.flow.server.startup.ClassLoaderAwareServletContainerInitializer
 import com.vaadin.flow.server.startup.ServletDeployer.StubServletConfig
 import com.vaadin.flow.theme.NoTheme
@@ -46,13 +45,10 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.Executor
 import java.util.regex.Pattern
-import java.util.stream.Collectors
-import java.util.stream.Stream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.servlet.*
@@ -94,85 +90,6 @@ import javax.servlet.annotation.WebListener
 )
 @WebListener
 class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializable, ServletContextListener {
-    internal class DevModeClassFinder(classes: Set<Class<*>?>?) : DefaultClassFinder(classes) {
-        companion object {
-            private val APPLICABLE_CLASS_NAMES = Collections.unmodifiableSet(calculateApplicableClassNames())
-
-            private fun calculateApplicableClassNames(): Set<String> {
-                val handlesTypes: HandlesTypes = DevModeInitializer::class.java.getAnnotation(HandlesTypes::class.java)
-                val values: Array<Class<Any>> = handlesTypes.value.map { (it as Any).javaClass }.toTypedArray()
-                return Stream.of<Class<*>>(*values).map { obj: Class<*> -> obj.name }
-                    .collect(Collectors.toSet())
-            }
-        }
-
-        override fun getAnnotatedClasses(annotation: Class<out Annotation?>): Set<Class<*>> {
-            ensureImplementation(annotation)
-            return super.getAnnotatedClasses(annotation)
-        }
-
-        override fun <T> getSubTypesOf(type: Class<T>): Set<Class<out T>> {
-            ensureImplementation(type)
-            return super.getSubTypesOf(type)
-        }
-
-        private fun ensureImplementation(clazz: Class<*>) {
-            require(APPLICABLE_CLASS_NAMES.contains(clazz.name)) {
-                ("Unexpected class name "
-                        + clazz + ". Implementation error: the class finder "
-                        + "instance is not aware of this class. "
-                        + "Fix @HandlesTypes annotation value for "
-                        + DevModeInitializer::class.java.name)
-            }
-        }
-    }
-
-    @Throws(ServletException::class)
-    override fun process(classes: Set<Class<*>?>?, context: ServletContext) {
-        val registrations: Collection<ServletRegistration> = context.servletRegistrations.values
-        var vaadinServletRegistration: ServletRegistration? = null
-
-        for (registration in registrations) {
-            try {
-                if (registration.className != null && isVaadinServletSubClass(registration.className)) {
-                    vaadinServletRegistration = registration
-                    break
-                }
-            } catch (e: ClassNotFoundException) {
-                throw ServletException(
-                    String.format(
-                        "Servlet class name (%s) can't be found!",
-                        registration.className
-                    ),
-                    e
-                )
-            }
-        }
-
-        val config = if (vaadinServletRegistration != null) {
-            StubServletConfig.createDeploymentConfiguration(context, vaadinServletRegistration, VaadinServlet::class.java)
-        } else {
-            StubServletConfig.createDeploymentConfiguration(context, VaadinServlet::class.java)
-        }
-        initDevModeHandler(classes, context, config)
-    }
-
-    @Throws(ClassNotFoundException::class)
-    private fun isVaadinServletSubClass(className: String): Boolean {
-        return VaadinServlet::class.java.isAssignableFrom(Class.forName(className))
-    }
-
-    override fun contextInitialized(ctx: ServletContextEvent) {
-        // No need to do anything on init
-    }
-
-    override fun contextDestroyed(ctx: ServletContextEvent) {
-        val handler = DevModeHandler.getDevModeHandler()
-        if (handler != null && !handler.reuseDevServer()) {
-            handler.stop()
-        }
-    }
-
     companion object {
         private val JAR_FILE_REGEX = Pattern.compile(".*file:(.+\\.jar).*")
 
@@ -188,10 +105,10 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
 
         // allow trailing slash
         private val DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT = Pattern.compile(
-                "^(?:file:)?(.+)"
-                        + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
-                        + "/?$"
-            )
+            "^(?:file:)?(.+)"
+                    + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
+                    + "/?$"
+        )
 
         /**
          * Initialize the devmode server if not in production mode or compatibility
@@ -227,8 +144,9 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
             val baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, null) ?: baseDirectoryFallback
             val generatedDir = System.getProperty(FrontendUtils.PARAM_GENERATED_DIR, FrontendUtils.DEFAULT_GENERATED_DIR)
 
-            val frontendFolder = config.getStringProperty(FrontendUtils.PARAM_FRONTEND_DIR,
-                    System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
+            val frontendFolder = config.getStringProperty(
+                FrontendUtils.PARAM_FRONTEND_DIR,
+                System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
 
             val builder = NodeTasks.Builder(DevModeClassFinder(classes), File(baseDir), File(generatedDir), File(frontendFolder))
 
@@ -314,15 +232,15 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
             }
 
             val nodeTasksFuture =
-            if (service is Executor) {
-                // if there is an executor use it to run the task
-                CompletableFuture.runAsync(
-                    runnable,
-                    service as Executor?
-                )
-            } else {
-                CompletableFuture.runAsync(runnable)
-            }
+                if (service is Executor) {
+                    // if there is an executor use it to run the task
+                    CompletableFuture.runAsync(
+                        runnable,
+                        service as Executor?
+                    )
+                } else {
+                    CompletableFuture.runAsync(runnable)
+                }
 
             DevModeHandler.start(config, builder.npmFolder, nodeTasksFuture)
         }
@@ -337,7 +255,7 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
          * (see tickets #8249, #8403).
          */
         private val baseDirectoryFallback: String
-            private get() {
+            get() {
                 val baseDirCandidate = System.getProperty("user.dir", ".")
                 val path = Paths.get(baseDirCandidate)
                 return if (path.toFile().isDirectory
@@ -522,6 +440,49 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                     zipOutputStream.closeEntry()
                 }
             }
+        }
+    }
+
+
+    @Throws(ServletException::class)
+    override fun process(classes: Set<Class<*>?>?, context: ServletContext) {
+        val registrations: Collection<ServletRegistration> = context.servletRegistrations.values
+        var vaadinServletRegistration: ServletRegistration? = null
+
+        for (registration in registrations) {
+            try {
+                if (registration.className != null && isVaadinServletSubClass(registration.className)) {
+                    vaadinServletRegistration = registration
+                    break
+                }
+            } catch (e: ClassNotFoundException) {
+                throw ServletException(String.format("Servlet class name (%s) can't be found!", registration.className), e)
+            }
+        }
+
+        val config =
+        if (vaadinServletRegistration != null) {
+            StubServletConfig.createDeploymentConfiguration(context, vaadinServletRegistration, VaadinServlet::class.java)
+        } else {
+            StubServletConfig.createDeploymentConfiguration(context, VaadinServlet::class.java)
+        }
+
+        initDevModeHandler(classes, context, config)
+    }
+
+    @Throws(ClassNotFoundException::class)
+    private fun isVaadinServletSubClass(className: String): Boolean {
+        return VaadinServlet::class.java.isAssignableFrom(Class.forName(className))
+    }
+
+    override fun contextInitialized(ctx: ServletContextEvent) {
+        // No need to do anything on init
+    }
+
+    override fun contextDestroyed(ctx: ServletContextEvent) {
+        val handler = DevModeHandler.getDevModeHandler()
+        if (handler != null && !handler.reuseDevServer()) {
+            handler.stop()
         }
     }
 }
