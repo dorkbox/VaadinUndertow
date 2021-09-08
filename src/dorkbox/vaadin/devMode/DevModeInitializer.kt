@@ -453,7 +453,7 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
     }
 
     override fun contextDestroyed(ctx: ServletContextEvent) {
-        val handler = DevModeHandler.getDevModeHandler()
+        val handler = DevModeHandler.devModeHandler
         if (handler != null && !handler.reuseDevServer()) {
             handler.stop()
         }
