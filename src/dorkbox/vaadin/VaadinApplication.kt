@@ -191,7 +191,7 @@ class VaadinApplication() {
         // NOTE: we cannot use "modules" yet (so no module-info.java file...) otherwise every dependency gets added to the module path,
         //    and since almost NONE of them support modules, this will break us.
         // find all of the jars in the module/classpath with resources in the META-INF directory
-        logger.info("Discovering all bundled jar $metaInfResources locations")
+        logger.info { "Discovering all bundled jar $metaInfResources locations" }
 
         val scanResultJarDependencies = ClassGraph()
                 .filterClasspathElements { it.endsWith(".jar") }
@@ -207,7 +207,7 @@ class VaadinApplication() {
 
         if (runningAsJar) {
             // collect all the resources available.
-            logger.info("Extracting all jar $metaInfResources files to $tempDir")
+            logger.info { "Extracting all jar $metaInfResources files to $tempDir" }
 
             scanResultJarDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
@@ -223,7 +223,7 @@ class VaadinApplication() {
                 if (!outputFile.exists()) {
                     val parentFile = outputFile.parentFile
                     if (!parentFile.isDirectory && !parentFile.mkdirs()) {
-                        logger.error("Unable to create output directory {}", parentFile)
+                        logger.error { "Unable to create output directory $parentFile" }
                     } else {
                         resource.open().use { input ->
                             outputFile.outputStream().use { input.copyTo(it) }
@@ -349,7 +349,7 @@ class VaadinApplication() {
                     }
                 }
                 else -> {
-                    logger.error("Attempt to collect resource for an undefined location!")
+                    logger.error { "Attempt to collect resource for an undefined location!" }
                 }
             }
         }
@@ -552,7 +552,7 @@ class VaadinApplication() {
             // are hardcoded to  "src/main/resources/META-INF/resources/frontend", so we have to
             // copy them ourselves from the correct location... ( node_modules/@vaadin/flow-frontend/ )
             val targetDir = File("build", FrontendUtils.NODE_MODULES + FrontendUtils.FLOW_NPM_PACKAGE_NAME).absoluteFile
-            logger.info("Copying local frontend resources to $targetDir")
+            logger.info { "Copying local frontend resources to $targetDir" }
             if (!targetDir.exists()) {
                 throw RuntimeException("Startup directories are missing! Unable to continue - please run compileResources for DEV mode!")
             }
