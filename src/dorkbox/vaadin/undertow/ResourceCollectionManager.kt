@@ -77,7 +77,7 @@ class ResourceCollectionManager(private val resources: List<ResourceManager>) : 
             try {
                 it.close()
             } catch (e: Exception) {
-                logger.error("Error closing resourceManager", e)
+                logger.error(e) { "Error closing resourceManager" }
             }
         }
     }
