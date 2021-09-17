@@ -31,7 +31,7 @@ plugins {
     id("com.dorkbox.VersionUpdate") version "2.3"
     id("com.dorkbox.GradlePublish") version "1.11"
 
-    kotlin("jvm") version "1.5.0"
+    kotlin("jvm") version "1.5.21"
 }
 
 object Extras {
@@ -48,8 +48,8 @@ object Extras {
     val buildDate = Instant.now().toString()
 
     const val coroutineVer = "1.4.3"
-    const val vaadinVer = "14.1.17"
-    const val undertowVer = "2.2.9.Final"
+    const val vaadinVer = "14.4.8" // this must be synchronized with the gradle plugin
+    const val undertowVer = "2.2.10.Final"
 }
 
 ///////////////////////////////
@@ -58,6 +58,7 @@ object Extras {
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 GradleUtils.defaults()
 GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
+//GradleUtils.jpms(JavaVersion.VERSION_1_9)
 
 
 licensing {
@@ -66,6 +67,12 @@ licensing {
         author(Extras.vendor)
         url(Extras.url)
     }
+
+    // add undertow?
+    // add jboss
+    // add ahoCoasick
+    //  * AhoCorasickDoubleArrayTrie Project
+    // *      https://github.com/hankcs/AhoCorasickDoubleArrayTrie
 }
 
 
@@ -91,7 +98,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Extras.coroutineVer}")
 
-    implementation("com.vaadin:vaadin:${Extras.vaadinVer}")
+    compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
     // we use undertow 2, with kotlin coroutines on top (with 1 actor per session)
     implementation("io.undertow:undertow-core:${Extras.undertowVer}")
@@ -100,23 +107,23 @@ dependencies {
 
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    implementation("io.github.classgraph:classgraph:4.8.110")
+    implementation("io.github.classgraph:classgraph:4.8.114")
 
     implementation("com.dorkbox:Updates:1.1")
 
-    implementation("com.conversantmedia:disruptor:1.2.19")
+//    implementation("com.conversantmedia:disruptor:1.2.19")
 
     // awesome logging framework for kotlin.
     // https://www.reddit.com/r/Kotlin/comments/8gbiul/slf4j_loggers_in_3_ways/
     // https://github.com/MicroUtils/kotlin-logging
-    implementation("io.github.microutils:kotlin-logging:2.0.10")
+    implementation("io.github.microutils:kotlin-logging:2.0.11")
 
     implementation("org.slf4j:slf4j-api:1.7.32")
     implementation("org.slf4j:jul-to-slf4j:1.7.32")
 
 
     implementation("ch.qos.logback:logback-core:1.2.5")
-    implementation("ch.qos.logback:logback-classic:1.2.5")
+    compileOnly("ch.qos.logback:logback-classic:1.2.5")
 
 
     testImplementation("junit:junit:4.13.2")

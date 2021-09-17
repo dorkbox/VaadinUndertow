@@ -13,17 +13,23 @@
        Kotlin Compiler, Test Data+Libraries, and Tools repository contain third-party code, to which different licenses may apply
        See: https://github.com/JetBrains/kotlin/blob/master/license/README.md
 
-     - kotlinx.coroutines - Library support for Kotlin coroutines with multiplatform support
-       [The Apache Software License, Version 2.0]
-       https://github.com/Kotlin/kotlinx.coroutines
-       Copyright 2021
-         JetBrains s.r.o.
-
      - Vaadin - An open platform for building modern web apps for Java back ends
        [The Apache Software License, Version 2.0]
        https://github.com/vaadin/
        Copyright 2021
          Vaadin Ltd.
+
+     - Logback - Logback is a logging framework for Java applications
+       [The Apache Software License, Version 2.0]
+       http://logback.qos.ch
+       Copyright 2021
+         QOS.ch
+
+     - kotlinx.coroutines - Library support for Kotlin coroutines with multiplatform support
+       [The Apache Software License, Version 2.0]
+       https://github.com/Kotlin/kotlinx.coroutines
+       Copyright 2021
+         JetBrains s.r.o.
 
      - Undertow - High performance non-blocking webserver
        [The Apache Software License, Version 2.0]
@@ -38,12 +44,6 @@
        https://github.com/classgraph/classgraph
        Copyright 2021
          Luke Hutchison
-
-     - Conversant Disruptor - Disruptor is the highest performing intra-thread transfer mechanism available in Java.
-       [The Apache Software License, Version 2.0]
-       https://github.com/conversant/disruptor
-       Copyright 2021
-         Conversant, Inc
 
      - kotlin-logging - Lightweight logging framework for Kotlin
        [The Apache Software License, Version 2.0]
@@ -60,12 +60,6 @@
      - JUL to SLF4J - Java Util Logging implemented over SLF4J
        [MIT License]
        http://www.slf4j.org
-       Copyright 2021
-         QOS.ch
-
-     - Logback - Logback is a logging framework for Java applications
-       [The Apache Software License, Version 2.0]
-       http://logback.qos.ch
        Copyright 2021
          QOS.ch
 
