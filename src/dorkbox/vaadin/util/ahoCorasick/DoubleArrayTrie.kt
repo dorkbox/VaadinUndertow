@@ -803,7 +803,7 @@ class DoubleArrayTrie<V>(map: Map<String, V>? = null,
          * construct failure table
          */
         private fun constructFailureStates() {
-            fail = IntArray(size + 1)
+            fail = IntArray(Math.max(size + 1, 2))
             fail[1] = base[0]
             output = arrayOfNulls(size + 1)
 
@@ -868,7 +868,10 @@ class DoubleArrayTrie<V>(map: Map<String, V>? = null,
 
             val siblings = ArrayList<Pair<Int, State>>(initialCapacity)
             fetch(rootNode, siblings)
-            insert(siblings)
+
+            if (siblings.isNotEmpty()) {
+                insert(siblings)
+            }
         }
 
         /**
@@ -1002,11 +1005,28 @@ class DoubleArrayTrie<V>(map: Map<String, V>? = null,
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val map = TreeMap<String, String>()
-            val keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com")
+            // test outliers
+            test(hashMapOf())
+
+            test(hashMapOf("bmw" to "bmw"))
+
+
+            var map = hashMapOf<String, String>()
+            var keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com")
             for (key in keyArray) {
                 map[key] = key
             }
+            test(map)
+
+            map = hashMapOf()
+            keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com", "reddit.google.com")
+            for (key in keyArray) {
+                map[key] = key
+            }
+            test(map)
+        }
+
+        fun test(map: Map<String, String>) {
             val trie = DoubleArrayTrie(map)
 
             val text = "reddit.google.com"

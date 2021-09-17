@@ -1,15 +1,12 @@
 package dorkbox.vaadin
 
-import com.vaadin.flow.server.Constants
-import com.vaadin.flow.server.InitParameters
 import com.vaadin.flow.server.VaadinServlet
 import com.vaadin.flow.server.frontend.FrontendUtils
 import dorkbox.vaadin.devMode.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
+import dorkbox.vaadin.util.VaadinConfig
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
-import elemental.json.JsonObject
-import elemental.json.impl.JsonUtil
 import io.github.classgraph.ClassGraph
 import io.github.classgraph.ScanResult
 import io.undertow.Undertow
@@ -20,7 +17,6 @@ import io.undertow.server.HttpServerExchange
 import io.undertow.server.handlers.cache.CacheHandler
 import io.undertow.server.handlers.cache.DirectBufferCache
 import io.undertow.server.handlers.resource.CachingResourceManager
-import io.undertow.server.handlers.resource.FileResourceManager
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.servlet.Servlets
 import io.undertow.servlet.api.ServletContainerInitializerInfo
@@ -51,6 +47,8 @@ import kotlin.reflect.KClass
  */
 class VaadinApplication() {
     companion object {
+        const val debugResources = true
+
         /**
          * Gets the version number.
          */
@@ -62,15 +60,14 @@ class VaadinApplication() {
         }
     }
 
-    val runningAsJar: Boolean
     private val logger = KotlinLogging.logger {}
+
+    val runningAsJar: Boolean
     val tempDir: File = File(System.getProperty("java.io.tmpdir", "tmpDir"), "undertow").absoluteFile
 
     private val onStopList = mutableListOf<Runnable>()
 
-    val devMode: Boolean
-    private val tokenFileName: String
-    val pNpmEnabled: Boolean
+    val vaadinConfig: VaadinConfig
 
     private lateinit var urlClassLoader: URLClassLoader
     private lateinit var resourceCollectionManager: ResourceCollectionManager
@@ -91,62 +88,7 @@ class VaadinApplication() {
         runningAsJar = CallingClass.get().getResource("")!!.protocol == "jar"
 
 
-        // find the config/stats.json to see what mode (PRODUCTION or DEV) we should run in.
-        // we COULD just check the existence of this file...
-        //   HOWEVER if we are testing a different configuration from our IDE, this method will not work...
-        var tokenJson: JsonObject? = null
-
-        val defaultTokenFile = "VAADIN/${FrontendUtils.TOKEN_FILE}"
-        // token location if we are running in a jar
-        val tokenInJar = this.javaClass.classLoader.getResource("META-INF/resources/$defaultTokenFile")
-        if (tokenInJar != null) {
-            tokenFileName = if (runningAsJar) {
-                // the token file name MUST always be from disk! This is hard coded, because later we copy out
-                // this file from the jar to the temp location.
-                File(tempDir, defaultTokenFile).absolutePath
-            } else {
-                if (tokenInJar.path.startsWith("/")) {
-                    tokenInJar.path.substring(1)
-                } else {
-                    tokenInJar.path
-                }
-            }
-
-            tokenJson = JsonUtil.parse(tokenInJar.readText(Charsets.UTF_8)) as JsonObject?
-        } else {
-            // maybe the token file is in the temp build location (used during dev work).
-            val devTokenFile = File("build").resolve("resources").resolve("main").resolve("META-INF").resolve("resources").resolve("VAADIN").resolve(FrontendUtils.TOKEN_FILE)
-            if (devTokenFile.canRead()) {
-                tokenFileName = devTokenFile.absoluteFile.normalize().path
-                tokenJson = JsonUtil.parse(File(tokenFileName).readText(Charsets.UTF_8)) as JsonObject?
-            }
-            else {
-                tokenFileName = ""
-            }
-        }
-
-        if (tokenFileName.isEmpty() || tokenJson == null || !tokenJson.hasKey(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)) {
-            // this is a problem! we must configure the system first via gradle!
-            throw java.lang.RuntimeException("Unable to continue! Error reading token!" +
-                    "You must FIRST compile the vaadin resources for DEV or PRODUCTION mode!")
-        }
-
-        devMode = !tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)
-        pNpmEnabled = tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_ENABLE_PNPM)
-
-        if (devMode && runningAsJar) {
-            throw RuntimeException("Invalid run configuration. It is not possible to run DEV MODE from a deployed jar.\n" +
-                                   "Something is severely wrong!")
-        }
-
-        // we are ALWAYS running in full Vaadin14 mode
-        System.setProperty(Constants.VAADIN_PREFIX + InitParameters.SERVLET_PARAMETER_COMPATIBILITY_MODE, "false")
-
-        if (devMode) {
-            // set the location of our frontend dir + generated dir when in dev mode
-            System.setProperty(FrontendUtils.PARAM_FRONTEND_DIR, tokenJson.getString(Constants.FRONTEND_TOKEN))
-            System.setProperty(FrontendUtils.PARAM_GENERATED_DIR, tokenJson.getString(Constants.GENERATED_TOKEN))
-        }
+        vaadinConfig = VaadinConfig(runningAsJar, tempDir)
     }
 
     private fun addAnnotated(annotationScanner: ScanResult,
@@ -173,11 +115,31 @@ class VaadinApplication() {
         }
     }
 
+    private fun recurseAllFiles(allRelativeFilePaths: MutableSet<WebResource>, file: File, rootFileSize: Int) {
+        file.listFiles()?.forEach {
+            if (it.isDirectory) {
+                recurseAllFiles(allRelativeFilePaths, it, rootFileSize)
+            } else {
+                val resourcePath = it.toURI().toURL()
+
+                // must ALSO use forward slash (unix)!!
+                val relativePath = resourcePath.path.substring(rootFileSize)
+
+                logger.error {
+                    "Disk resource: $relativePath"
+                }
+
+                allRelativeFilePaths.add(WebResource(relativePath, resourcePath))
+            }
+        }
+    }
+
     @Suppress("DuplicatedCode")
     fun initResources() {
         val metaInfResources = "META-INF/resources"
-        val buildMetaInfResources = "build/resources/main/META-INF/resources"
         val metaInfValLength = metaInfResources.length + 1
+
+        val buildMetaInfResources = "build/resources/main/META-INF/resources"
 
 
         // resource locations are tricky...
@@ -206,25 +168,38 @@ class VaadinApplication() {
                 .scan()
 
 
-        val jarLocations = mutableSetOf<URL>()
-        val diskLocations = mutableSetOf<URL>()
+        val jarLocations = mutableSetOf<WebResourceString>()
+        val diskLocations = mutableSetOf<WebResource>()
+        val urlClassLoader = mutableSetOf<URL>()
 
-        if (runningAsJar) {
-            // collect all the resources available.
-            logger.info { "Extracting all jar $metaInfResources files to $tempDir" }
+        if (runningAsJar && vaadinConfig.extractFromJar) {
+            // running from JAR (really just temp-dir, since the jar is extracted!)
+            logger.info { "Running from jar and extracting all jar [$metaInfResources] files to [$tempDir]" }
 
+            var lastFile: File? = null
             scanResultJarDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-                logger.trace {
-                    "Discovered resource: $relativePath"
+//                // we only care about VAADIN and frontend resources for JARs -- everything else is compiled as part of the webpack process.
+//                val lower = relativePath.lowercase(Locale.US)
+//                if (!lower.startsWith("vaadin") && !lower.startsWith("frontend")) {
+//                    logger.trace { "Skipping classpath resource: $relativePath" }
+//                    return@forEach
+//                }
+
+                logger.error { "Jar resource: $relativePath"  }
+                if (lastFile != resource.classpathElementFile) {
+                    lastFile = resource.classpathElementFile
+                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 // we should copy this resource out, since loading resources from jar files is time+memory intensive
-                val outputFile = File(tempDir, relativePath)
+                val outputFile = tempDir.resolve(relativePath)
 
-                if (!outputFile.exists()) {
+//                // TODO: should overwrite file? check hashes?
+                // if there is ever a NEW version of our code run, the OLD version will still run if the files are not overwritten!
+//                if (!outputFile.exists()) {
                     val parentFile = outputFile.parentFile
                     if (!parentFile.isDirectory && !parentFile.mkdirs()) {
                         logger.error { "Unable to create output directory $parentFile" }
@@ -233,148 +208,254 @@ class VaadinApplication() {
                             outputFile.outputStream().use { input.copyTo(it) }
                         }
                     }
-                }
+//                }
+
+                diskLocations.add(WebResource(relativePath, outputFile.toURI().toURL()))
             }
 
-            val locations = arrayOf(tempDir.toURI().toURL())
-            jarLocations.addAll(locations)
 
-            // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
-            urlClassLoader = object : URLClassLoader(locations, this.javaClass.classLoader) {
-                override fun getResource(name: String): URL? {
-                    if (name.startsWith("META-INF")) {
-                        // the problem is that:
-                        //   request is :  META-INF/VAADIN/build/webcomponentsjs/webcomponents-loader.js
-                        //   resource is:  VAADIN/build/webcomponentsjs/webcomponents-loader.js
+        } else if (runningAsJar) {
+            // running from JAR (not-extracted!)
+            logger.info { "Running from jar files" }
 
-                        val fixedName = name.substring("META-INF".length)
-                        return super.getResource(fixedName)
-                    }
+            var lastFile: File? = null
+            scanResultJarDependencies.allResources.forEach { resource ->
+                val resourcePath = resource.pathRelativeToClasspathElement
+                val relativePath = resourcePath.substring(metaInfValLength)
 
-                    return super.getResource(name)
+//                // we only care about VAADIN and frontend resources for JARs -- everything else is compiled as part of the webpack process.
+//                val lower = relativePath.lowercase(Locale.US)
+//                if (!lower.startsWith("vaadin") && !lower.startsWith("frontend")) {
+//                    logger.trace { "Skipping JAR resource: $relativePath" }
+//                    return@forEach
+//                }
+
+                logger.error { "Jar resource: $relativePath" }
+                if (lastFile != resource.classpathElementFile) {
+                    lastFile = resource.classpathElementFile
+                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
                 }
+
+                // these are all resources inside JAR files.
+                jarLocations.add(WebResourceString(relativePath, resource.classpathElementURL, resourcePath))
+
+                // jar file this resource is from -- BUT NOT THE RESOURCE ITSELF
+                urlClassLoader.add(resource.classpathElementURL)
             }
-        }
-        else {
-            // when we are running in DISK (aka, not-running-as-a-jar) mode, we are NOT extracting all of the resources to a temp location.
-            // BECAUSE of this, we must create a MAP of the RELATIVE resource name --> ABSOLUTE resource name
-            // This is so our classloader can find the resource without having to manually configure each requests.
-            val jarResourceRequestMap = TreeMap<String, String>()
-            val diskResourceRequestMap = TreeMap<String, URL>()
 
 
+        } else {
+            // running from IDE
+            logger.info { "Running from IDE files" }
+
+            var lastFile: File? = null
             scanResultJarDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
                 logger.error { "Jar resource: $relativePath" }
+                if (lastFile != resource.classpathElementFile) {
+                    lastFile = resource.classpathElementFile
+                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
+                }
 
-                jarLocations.add(resource.classpathElementURL)
+                // these are all resources inside JAR files.
+                jarLocations.add(WebResourceString(relativePath, resource.url, resourcePath))
 
-                jarResourceRequestMap[relativePath] = resourcePath
-                // some-of the resources are loaded with a "META-INF" prefix by the vaadin servlet
-                jarResourceRequestMap["META-INF/$relativePath"] = resourcePath
+                // jar file this resource is from -- BUT NOT THE RESOURCE ITSELF
+                urlClassLoader.add(resource.classpathElementURL)
             }
-
 
             // some static resources from disk are ALSO loaded by the classloader.
             scanResultLocalDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-                logger.error { "Classpath resource: $relativePath" }
+                logger.error { "Local resource: $relativePath" }
 
-                diskLocations.add(resource.classpathElementURL)
-
-                val url = resource.url
-                diskResourceRequestMap[relativePath] = url
-
-                // some-of the resources are loaded with a "META-INF" prefix by the vaadin servlet
-                diskResourceRequestMap["META-INF/$relativePath"] = url
+                diskLocations.add(WebResource(relativePath, resource.url))
             }
 
             // we also have resources that are OUTSIDE the classpath (ie: in the temp build dir)
             // This is necessary BECAUSE we have to be able to ALSO serve resources via the classloader!
             val buildDirMetaInfResources = File(buildMetaInfResources).absoluteFile.normalize()
             val rootPathLength = buildDirMetaInfResources.toURI().toURL().path.length
-            recurseAllFiles(diskResourceRequestMap, buildDirMetaInfResources, rootPathLength)
+            recurseAllFiles(diskLocations, buildDirMetaInfResources, rootPathLength)
+        }
 
+        // we use the TRIE data structure to QUICKLY find what we are looking for.
+        // This is so our classloader can find the resource without having to manually configure each request.
+        val jarStringResourceRequestMap = mutableMapOf<String, String>()
+        val jarUrlResourceRequestMap = mutableMapOf<String, URL>()
+        val diskResourceRequestMap = mutableMapOf<String, URL>()
 
-            // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
-            // NOTE: this is what ALSO will load the stats.json file!
-            urlClassLoader = object : URLClassLoader(jarLocations.toTypedArray(), this.javaClass.classLoader) {
-                val jarTrie = DoubleArrayTrie(jarResourceRequestMap)
-                val diskTrie = DoubleArrayTrie(diskResourceRequestMap)
+        jarLocations.forEach { (requestPath, resourcePath, relativeResourcePath) ->
+            // make sure the path is WWW request compatible (ie: no spaces/etc)
+            val wwwCompatiblePath = java.net.URLDecoder.decode(requestPath, Charsets.UTF_8)
 
-                override fun getResource(name: String): URL? {
-                    // check disk first
-                    val diskResourcePath = diskTrie[name]
-                    if (diskResourcePath != null) {
-                        return diskResourcePath
-                    }
+            // this adds the resource to our request map, used by our trie
+            jarStringResourceRequestMap[wwwCompatiblePath] = relativeResourcePath
+            jarUrlResourceRequestMap[wwwCompatiblePath] = resourcePath
 
-                    val jarResourcePath = jarTrie[name]
-                    if (jarResourcePath != null) {
-                        return super.getResource(jarResourcePath)
-                    }
-
-                    return super.getResource(name)
-                }
+            if (!wwwCompatiblePath.startsWith("META-INF")) {
+                // some-of the resources are loaded with a "META-INF" prefix by the vaadin servlet
+                jarStringResourceRequestMap["META-INF/$wwwCompatiblePath"] = relativeResourcePath
+                jarUrlResourceRequestMap["META-INF/$wwwCompatiblePath"] = resourcePath
             }
 
-            // we also have resources that are OUTSIDE the classpath (ie: in the temp build dir)
-            diskLocations.add(buildDirMetaInfResources.toURI().toURL())
+            if (!wwwCompatiblePath.startsWith('/')) {
+                // some-of the resources are loaded with a "/" prefix by the vaadin servlet
+                jarStringResourceRequestMap["/$wwwCompatiblePath"] = relativeResourcePath
+                jarUrlResourceRequestMap["/$wwwCompatiblePath"] = resourcePath
+            }
         }
+
+        diskLocations.forEach { (requestPath, resourcePath) ->
+            // make sure the path is WWW request compatible (ie: no spaces/etc)
+            val wwwCompatiblePath = java.net.URLDecoder.decode(requestPath, Charsets.UTF_8)
+
+            // this adds the resource to our request map, used by our trie
+            diskResourceRequestMap[wwwCompatiblePath] = resourcePath
+
+            if (!wwwCompatiblePath.startsWith("META-INF")) {
+                // some-of the resources are loaded with a "META-INF" prefix by the vaadin servlet
+                diskResourceRequestMap["META-INF/$wwwCompatiblePath"] = resourcePath
+            }
+
+            if (!wwwCompatiblePath.startsWith('/')) {
+                // some-of the resources are loaded with a "/" prefix by the vaadin servlet
+                diskResourceRequestMap["/$wwwCompatiblePath"] = resourcePath
+            }
+        }
+
+        // EVERYTHING IS ACCESSED VIA TRIE, NOT VIA HASHMAP! (it's faster this way)
+        val jarStringTrie = DoubleArrayTrie(jarStringResourceRequestMap)
+        val jarUrlTrie = DoubleArrayTrie(jarUrlResourceRequestMap)
+        val diskTrie = DoubleArrayTrie(diskResourceRequestMap)
+
+                                                                                    //URL Classloader: META-INF/VAADIN/build/vaadin-bundle-4d7dbedf0dba552475bc.cache.js
+        // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
+        // NOTE: this will load the stats.json file!
+        val toTypedArray = jarLocations.map { it.resourcePath }.toTypedArray()
+        this.urlClassLoader = object : URLClassLoader(toTypedArray, this.javaClass.classLoader) {
+            override fun getResource(name: String): URL? {
+                if (debugResources) {
+                    println(" URL Classloader: $name")
+                }
+
+                // check disk first
+                val diskResourcePath: URL? = diskTrie[name]
+                if (diskResourcePath != null) {
+                    if (debugResources) {
+                        println("TRIE: $diskResourcePath")
+                    }
+                    return diskResourcePath
+                }
+
+                val jarResourcePath: String? = jarStringTrie[name]
+                if (jarResourcePath != null) {
+                    if (debugResources) {
+                        println("TRIE: $jarResourcePath")
+                    }
+                    return super.getResource(jarResourcePath)
+                }
+
+                return super.getResource(name)
+            }
+        }
+
+        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie)
+        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie)
+
+//        val jarResources = ArrayList<JarResourceManager>()
+//        jarLocations.forEach { (requestPath, resourcePath, relativeResourcePath) ->
+////            val cleanedUrl = java.net.URLDecoder.decode(jarUrl.file, Charsets.UTF_8)
+//            val file = File(resourcePath.file)
+//
+//            if (debugResources) {
+//                println(" JAR: $file")
+//            }
+//
+//            // the location IN THE JAR is actually "META-INF/resources", so we want to make sure of that when
+//            // serving the request, that the correct path is used.
+//            jarResources.add(JarResourceManager(file, metaInfResources))
+//        }
+
 
         //  collect all the resources available from each location to ALSO be handled by undertow
-        val diskResources = ArrayList<FileResourceManager>()
-        val jarResources = ArrayList<JarResourceManager>()
-        val fileResources = ArrayList<FileResourceManager>()
+//        val diskResources = ArrayList<FileResourceManager>()
+//        val fileResources = ArrayList<FileResourceManager>()
 
 
-        jarLocations.forEach { jarUrl ->
-            val cleanedUrl = java.net.URLDecoder.decode(jarUrl.file, Charsets.UTF_8)
-            val file = File(cleanedUrl)
 
-            // the location IN THE JAR is actually "META-INF/resources", so we want to make sure of that when
-            // serving the request, that the correct path is used.
-            jarResources.add(JarResourceManager(file, metaInfResources))
-        }
 
-        diskLocations.forEach { diskUrl ->
-            val cleanedUrl = java.net.URLDecoder.decode(diskUrl.file, Charsets.UTF_8)
-            val file = File(cleanedUrl)
 
-            // if this location is where our "META-INF/resources" directory exists, ALSO add that location, because the
-            // vaadin will request resources based on THAT location as well.
-            val metaInfResourcesLocation = File(file, metaInfResources)
-            if (metaInfResourcesLocation.isDirectory) {
-                diskResources.add(FileResourceManager(metaInfResourcesLocation))
-
-                // we will also serve content from ALL child directories
-                metaInfResourcesLocation.listFiles()?.forEach { childFile ->
-                    when {
-                        childFile.isDirectory -> prefixResources.add("/${childFile.relativeTo(metaInfResourcesLocation)}")
-                        else -> exactResources.add("/${childFile.relativeTo(metaInfResourcesLocation)}")
-                    }
-                }
-            }
-
-            diskResources.add(FileResourceManager(file))
-
-            // we will also serve content from ALL child directories
-            //   (except for the META-INF dir, which we are ALREADY serving content)
-            file.listFiles()?.forEach { childFile ->
-                when {
-                    childFile.isDirectory -> {
-                        if (childFile.name != "META-INF") {
-                            prefixResources.add("/${childFile.relativeTo(file)}")
-                        }
-                    }
-                    else -> exactResources.add("/${childFile.relativeTo(file)}")
-                }
-            }
-        }
+//        diskLocations.forEach { (requestPath, resourcePath) ->
+//            val wwwCompatiblePath = java.net.URLDecoder.decode(requestPath, Charsets.UTF_8)
+//            val diskFile = resourcePath.file
+//
+//
+//            // this serves a BASE location!
+//            diskResources.add(FileResourceManager(metaInfResourcesLocation))
+//
+//            // if this location is where our "META-INF/resources" directory exists, ALSO add that location, because the
+//            // vaadin will request resources based on THAT location as well.
+//            val metaInfResourcesLocation = File(file, metaInfResources)
+//
+//            if (metaInfResourcesLocation.isDirectory) {
+//                diskResources.add(FileResourceManager(metaInfResourcesLocation))
+//
+//                // we will also serve content from ALL child directories
+//                metaInfResourcesLocation.listFiles()?.forEach { childFile ->
+//                    val element = "/${childFile.relativeTo(metaInfResourcesLocation)}"
+//                    if (debugResources) {
+//                        println(" DISK: $cleanedUrl")
+//                    }
+//
+//                    when {
+//                        childFile.isDirectory -> prefixResources.add(element)
+//                        else -> exactResources.add(element)
+//                    }
+//                }
+//            }
+//
+//            if (debugResources) {
+//                println(" DISK: $cleanedUrl")
+//            }
+//
+//            diskResources.add(FileResourceManager(file))
+//
+//            // we will also serve content from ALL child directories
+//            //   (except for the META-INF dir, which we are ALREADY serving content)
+//            file.listFiles()?.forEach { childFile ->
+//                val element = "/${childFile.relativeTo(file)}"
+//
+//                if (debugResources) {
+//                    println(" DISK: $element")
+//                }
+//
+//                when {
+//                    childFile.isDirectory -> {
+//                        if (childFile.name != "META-INF") {
+//                            prefixResources.add(element)
+//                        }
+//                    }
+//                    else -> exactResources.add(element)
+//                }
+//            }
+//        }
+//        jarLocations.forEach { jarUrl ->
+//            val cleanedUrl = java.net.URLDecoder.decode(jarUrl.file, Charsets.UTF_8)
+//            val file = File(cleanedUrl)
+//
+//            if (debugResources) {
+//                println(" JAR: $cleanedUrl")
+//            }
+//
+//            // the location IN THE JAR is actually "META-INF/resources", so we want to make sure of that when
+//            // serving the request, that the correct path is used.
+//            jarResources.add(JarResourceManager(file, metaInfResources))
+//        }
 
         // When we are searching for resources, the following search order is optimized for access speed and request hit order
         //   DISK
@@ -384,60 +465,37 @@ class VaadinApplication() {
         //     flow-push
         //     flow-server
         //     then every other jar
-        resources.addAll(diskResources)
-        resources.addAll(fileResources)
+        resources.add(strictFileResourceManager)
+        resources.add(jarResourceManager)
+//        resources.addAll(diskResources)
+//        resources.addAll(fileResources)
 
-        val client = jarResources.firstOrNull { it.name.contains("flow-client") }
-        val push = jarResources.firstOrNull { it.name.contains("flow-push") }
-        val server = jarResources.firstOrNull { it.name.contains("flow-server") }
 
-        if (client != null && push != null && server != null) {
-            // these jars will ALWAYS be available (as of Vaadin 14.2)
-            // if we are running from a fatjar, then the resources will likely be extracted (so this is not necessary)
-            jarResources.remove(client)
-            jarResources.remove(push)
-            jarResources.remove(server)
-
-            resources.add(client)
-            resources.add(push)
-            resources.add(server)
-        }
-
-        resources.addAll(jarResources)
+//        val client = jarResources.firstOrNull { it.name.contains("flow-client") }
+//        val push = jarResources.firstOrNull { it.name.contains("flow-push") }
+//        val server = jarResources.firstOrNull { it.name.contains("flow-server") }
+//
+//        if (client != null && push != null && server != null) {
+//            // these jars will ALWAYS be available (as of Vaadin 14.2)
+//            // if we are running from a fatjar, then the resources will likely be extracted (so this is not necessary)
+//            jarResources.remove(client)
+//            jarResources.remove(push)
+//            jarResources.remove(server)
+//
+//            resources.add(client)
+//            resources.add(push)
+//            resources.add(server)
+//        }
+//
+//        resources.addAll(jarResources)
 
         // TODO: Have a 404 resource handler to log when a requested file is not found!
 
         // NOTE: atmosphere is requesting the full path of 'WEB-INF/classes/'.
-        //   What do to? search this with classgraph OR we re-map this to 'out/production/classes/' ??
+        //   What to do? search this with classgraph OR we re-map this to 'out/production/classes/' ??
         //   also accessed is : WEB-INF/lib/
 
         // TODO: runtime GZ compression of resources!?! only necessary in the JAR run mode (which is what runs on servers)
-    }
-
-    // Does not add to locations!
-    private fun recurseAllFiles(
-        resourceRequestMap: TreeMap<String, URL>,
-        file: File,
-        rootFileSize: Int
-    ) {
-        file.listFiles()?.forEach {
-            if (it.isDirectory) {
-                recurseAllFiles(resourceRequestMap, it, rootFileSize)
-            } else {
-                val resourcePath = it.toURI().toURL()
-
-                // must ALSO use forward slash (unix)!!
-                val relativePath = resourcePath.path.substring(rootFileSize)
-
-                logger.error {
-                    "Disk resource: $relativePath"
-                }
-
-                resourceRequestMap[relativePath] = resourcePath
-                // some-of the resources are loaded with a "META-INF" prefix by the vaadin servlet
-                resourceRequestMap["META-INF/$relativePath"] = resourcePath
-            }
-        }
     }
 
     fun initServlet(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int,
@@ -473,19 +531,14 @@ class VaadinApplication() {
             .setLoadOnStartup(1)
             .setAsyncSupported(true)
             .setExecutor(null) // we use coroutines!
-            .addInitParam("productionMode", (!devMode).toString()) // this is set via the gradle build
 
             // have to say where our NPM/dev mode files live.
             .addInitParam(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
 
-            // have to say where our token file lives
-            .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
-
-            // where our stats.json file lives. This loads via classloader, not via a file!!
-            .addInitParam(InitParameters.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
-
             .addInitParam("enable-websockets", "true")
             .addMapping("/*")
+
+        vaadinConfig.addServletInitParameters(servlet)
 
 
         // setup (or change) custom config options (
@@ -536,7 +589,7 @@ class VaadinApplication() {
 
         ClassGraph().enableAnnotationInfo().enableClassInfo().scan().use { annotationScanner ->
             for (service in serviceLoader) {
-                val classSet = hashSetOf<Class<*>>()
+                val classSet: HashSet<Class<*>> = hashSetOf()
                 val javaClass = service.javaClass
                 val annotation= javaClass.getAnnotation(HandlesTypes::class.java)
 
@@ -549,7 +602,7 @@ class VaadinApplication() {
 
                 if (classSet.isNotEmpty()) {
                     if (javaClass == com.vaadin.flow.server.startup.DevModeInitializer::class.java) {
-                        if (devMode) {
+                        if (vaadinConfig.devMode) {
                             // instead of the default, we load **OUR** dev-mode initializer.
                             // The vaadin one is super buggy for custom environments
                             servletBuilder.addServletContainerInitializer(
@@ -596,7 +649,7 @@ class VaadinApplication() {
          */
 
 
-        if (devMode) {
+        if (vaadinConfig.devMode) {
             // NOTE: The vaadin flow files only exist AFTER vaadin is initialized, so this block MUST be after 'manager.deploy()'
             // in dev mode, the local resources are hardcoded to an **INCORRECT** location. They
             // are hardcoded to  "src/main/resources/META-INF/resources/frontend", so we have to
@@ -651,7 +704,11 @@ class VaadinApplication() {
     }
 
     fun handleRequest(exchange: HttpServerExchange) {
+        // dev-mode : incoming requests USUALLY start with a '/'
         val path = exchange.relativePath
+        if (debugResources) {
+            println("REQUEST undertow: $path")
+        }
 
         // serve the following directly via the resource handler, so we can do it directly in the networking IO thread.
         // Because this is non-blocking, this is also the preferred way to do this for performance.
@@ -743,7 +800,12 @@ class VaadinApplication() {
             //                servletWebapp.destroy()
             //                allChannels.close().awaitUninterruptibly()
 
-            worker?.shutdown() // maybe?
+            val worker = worker
+            if (worker != null) {
+                worker.shutdown()
+                worker.awaitTermination(10L, TimeUnit.SECONDS)
+            }
+
             undertowServer?.stop()
         } finally {
             onStopList.forEach {

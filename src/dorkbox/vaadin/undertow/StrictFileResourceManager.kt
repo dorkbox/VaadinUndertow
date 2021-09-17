@@ -18,26 +18,25 @@ package dorkbox.vaadin.undertow
 import dorkbox.vaadin.VaadinApplication
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.undertow.UndertowMessages
+import io.undertow.server.handlers.resource.FileResource
 import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
-import io.undertow.server.handlers.resource.URLResource
+import java.io.File
 import java.io.IOException
 import java.net.URL
 
 /**
- * [ResourceManager] for JAR resources.
+ * [ResourceManager] for pre-scanned file resources.
  *
- * @author Ivan Sopov
- * @author Andy Wilkinson
  * @author Dorkbox LLC
  */
-internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<URL>) : ResourceManager {
+internal class StrictFileResourceManager(val name: String, val trie: DoubleArrayTrie<URL>) : io.undertow.server.handlers.resource.FileResourceManager(File(".")) {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
         if (VaadinApplication.debugResources) {
-            println("REQUEST jar: $path")
+            println("REQUEST static: $path")
         }
 
         val url = trie[path] ?: return null
@@ -46,7 +45,7 @@ internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<UR
             println("TRIE: $url")
         }
 
-        val resource = URLResource(url, path)
+        val resource = FileResource(File(url.file), this, path)
         if (path.isNotBlank() && path != "/" && resource.contentLength < 0) {
             return null
         }
@@ -71,6 +70,6 @@ internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<UR
     }
 
     override fun toString(): String {
-        return "JarResourceManager($name)"
+        return "FileResourceManager($name)"
     }
 }
