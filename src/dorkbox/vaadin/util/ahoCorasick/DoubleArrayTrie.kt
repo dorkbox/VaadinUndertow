@@ -1001,37 +1001,36 @@ class DoubleArrayTrie<V>(map: Map<String, V>? = null,
         }
     }
 
-    companion object {
-
-        @JvmStatic
-        fun main(args: Array<String>) {
-            // test outliers
-            test(hashMapOf())
-
-            test(hashMapOf("bmw" to "bmw"))
-
-
-            var map = hashMapOf<String, String>()
-            var keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com")
-            for (key in keyArray) {
-                map[key] = key
-            }
-            test(map)
-
-            map = hashMapOf()
-            keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com", "reddit.google.com")
-            for (key in keyArray) {
-                map[key] = key
-            }
-            test(map)
-        }
-
-        fun test(map: Map<String, String>) {
-            val trie = DoubleArrayTrie(map)
-
-            val text = "reddit.google.com"
-            println(trie.parseText(text).toString())
-            println(trie.exactMatchSearch(text))
-        }
-    }
+//    companion object {
+//        @JvmStatic
+//        fun main(args: Array<String>) {
+//            // test outliers
+//            test(hashMapOf())
+//
+//            test(hashMapOf("bmw" to "bmw"))
+//
+//
+//            var map = hashMapOf<String, String>()
+//            var keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com")
+//            for (key in keyArray) {
+//                map[key] = key
+//            }
+//            test(map)
+//
+//            map = hashMapOf()
+//            keyArray = arrayOf("bmw.com", "cnn.com", "google.com", "reddit.com", "reddit.google.com")
+//            for (key in keyArray) {
+//                map[key] = key
+//            }
+//            test(map)
+//        }
+//
+//        fun test(map: Map<String, String>) {
+//            val trie = DoubleArrayTrie(map)
+//
+//            val text = "reddit.google.com"
+//            println(trie.parseText(text).toString())
+//            println(trie.exactMatchSearch(text))
+//        }
+//    }
 }
