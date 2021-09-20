@@ -47,7 +47,7 @@ import kotlin.reflect.KClass
  */
 class VaadinApplication() {
     companion object {
-        const val debugResources = true
+        const val debugResources = false
 
         /**
          * Gets the version number.
@@ -188,10 +188,10 @@ class VaadinApplication() {
 //                    return@forEach
 //                }
 
-                logger.error { "Jar resource: $relativePath"  }
+                logger.debug { "Jar resource: $relativePath"  }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 // we should copy this resource out, since loading resources from jar files is time+memory intensive
@@ -202,7 +202,7 @@ class VaadinApplication() {
 //                if (!outputFile.exists()) {
                     val parentFile = outputFile.parentFile
                     if (!parentFile.isDirectory && !parentFile.mkdirs()) {
-                        logger.error { "Unable to create output directory $parentFile" }
+                        logger.debug { "Unable to create output directory $parentFile" }
                     } else {
                         resource.open().use { input ->
                             outputFile.outputStream().use { input.copyTo(it) }
@@ -230,10 +230,10 @@ class VaadinApplication() {
 //                    return@forEach
 //                }
 
-                logger.error { "Jar resource: $relativePath" }
+                logger.debug { "Jar resource: $relativePath" }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 // these are all resources inside JAR files.
@@ -253,10 +253,10 @@ class VaadinApplication() {
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-                logger.error { "Jar resource: $relativePath" }
+                logger.debug { "Jar resource: $relativePath" }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.error { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 // these are all resources inside JAR files.
@@ -271,7 +271,7 @@ class VaadinApplication() {
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-                logger.error { "Local resource: $relativePath" }
+                logger.debug { "Local resource: $relativePath" }
 
                 diskLocations.add(WebResource(relativePath, resource.url))
             }
