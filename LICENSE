@@ -5,6 +5,22 @@
      Dorkbox LLC
 
    Extra license information
+     - AhoCorasickDoubleArrayTrie - Vaadin support for the Undertow web server
+       [The Apache Software License, Version 2.0]
+       https://github.com/hankcs/AhoCorasickDoubleArrayTrie
+       Copyright 2018
+         hankcs <me@hankcs.com>
+
+     - Spring Boot - Undertow utility files
+       [The Apache Software License, Version 2.0]
+       https://github.com/spring-projects/spring-boot/tree/main/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/web/embedded/undertow
+
+     - StubbornJava - Unconventional Java code for building web servers / services without a framework
+       [MIT License]
+       https://github.com/StubbornJava/StubbornJava
+       Copyright 2017
+         Bill O'Neil
+
      - Kotlin - 
        [The Apache Software License, Version 2.0]
        https://github.com/JetBrains/kotlin

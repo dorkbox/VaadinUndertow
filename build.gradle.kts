@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-import dorkbox.gradle.kotlin
-import java.time.Instant
-
 ///////////////////////////////
 //////    PUBLISH TO SONATYPE / MAVEN CENTRAL
 ////// TESTING : (to local maven repo) <'publish and release' - 'publishToMavenLocal'>
 ////// RELEASE : (to sonatype/maven central), <'publish and release' - 'publishToSonatypeAndRelease'>
 ///////////////////////////////
 
+import dorkbox.gradle.kotlin
+import java.time.Instant
+
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "2.9"
+    id("com.dorkbox.GradleUtils") version "2.11"
     id("com.dorkbox.Licensing") version "2.9"
     id("com.dorkbox.VersionUpdate") version "2.3"
     id("com.dorkbox.GradlePublish") version "1.11"
@@ -66,13 +66,26 @@ licensing {
         description(Extras.description)
         author(Extras.vendor)
         url(Extras.url)
-    }
 
-    // add undertow?
-    // add jboss
-    // add ahoCoasick
-    //  * AhoCorasickDoubleArrayTrie Project
-    // *      https://github.com/hankcs/AhoCorasickDoubleArrayTrie
+        extra("AhoCorasickDoubleArrayTrie", License.APACHE_2) {
+            description(Extras.description)
+            copyright(2018)
+            author("hankcs <me@hankcs.com>")
+            url("https://github.com/hankcs/AhoCorasickDoubleArrayTrie")
+        }
+
+        extra("Spring Boot", License.APACHE_2) {
+            description("Undertow utility files")
+            url("https://github.com/spring-projects/spring-boot/tree/main/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/web/embedded/undertow")
+        }
+
+        extra("StubbornJava", License.MIT) {
+            description("Unconventional Java code for building web servers / services without a framework")
+            copyright(2017)
+            author("Bill O'Neil")
+            url("https://github.com/StubbornJava/StubbornJava")
+        }
+    }
 }
 
 
@@ -84,12 +97,27 @@ sourceSets {
             // want to include java+kotlin files for the source. 'setSrcDirs' resets includes...
             include("**/*.java", "**/*.kt")
         }
+    }
+}
 
-        kotlin {
-            setSrcDirs(listOf("src"))
+kotlin {
+    sourceSets {
+        main {
+            kotlin {
+                setSrcDirs(listOf("src"))
 
-            // want to include kotlin files for the source. 'setSrcDirs' resets includes...
-            include("**/*.java", "**/*.kt")
+                // want to include kotlin files for the source. 'setSrcDirs' resets includes...
+                include("**/*.java", "**/*.kt")
+            }
+        }
+
+        test {
+            kotlin {
+                setSrcDirs(listOf("test"))
+
+                // want to include kotlin files for the source. 'setSrcDirs' resets includes...
+                include("**/*.java", "**/*.kt")
+            }
         }
     }
 }
