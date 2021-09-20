@@ -26,9 +26,9 @@ import java.time.Instant
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "2.11"
-    id("com.dorkbox.Licensing") version "2.9"
-    id("com.dorkbox.VersionUpdate") version "2.3"
+    id("com.dorkbox.GradleUtils") version "2.13"
+    id("com.dorkbox.Licensing") version "2.9.2"
+    id("com.dorkbox.VersionUpdate") version "2.4"
     id("com.dorkbox.GradlePublish") version "1.11"
 
     kotlin("jvm") version "1.5.21"
@@ -39,7 +39,7 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "0.1"
+    const val version = "14.0"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -146,12 +146,13 @@ dependencies {
     // https://github.com/MicroUtils/kotlin-logging
     implementation("io.github.microutils:kotlin-logging:2.0.11")
 
-    implementation("org.slf4j:slf4j-api:1.7.32")
-    implementation("org.slf4j:jul-to-slf4j:1.7.32")
+    // 1.8.0-beta4 supports jpms
+    implementation("org.slf4j:slf4j-api:1.8.0-beta4")
+    implementation("org.slf4j:jul-to-slf4j:1.8.0-beta4")
 
 
-    implementation("ch.qos.logback:logback-core:1.2.5")
-    compileOnly("ch.qos.logback:logback-classic:1.2.5")
+    implementation("ch.qos.logback:logback-core:1.3.0-alpha4")
+    compileOnly("ch.qos.logback:logback-classic:1.3.0-alpha4")
 
 
     testImplementation("junit:junit:4.13.2")
