@@ -15,7 +15,6 @@
  */
 package dorkbox.vaadin.undertow
 
-import dorkbox.vaadin.VaadinApplication
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.undertow.UndertowMessages
 import io.undertow.server.handlers.resource.FileResource
@@ -31,17 +30,17 @@ import java.net.URL
  *
  * @author Dorkbox LLC
  */
-internal class StrictFileResourceManager(val name: String, val trie: DoubleArrayTrie<URL>) : io.undertow.server.handlers.resource.FileResourceManager(File(".")) {
+internal class StrictFileResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val debug: Boolean) : io.undertow.server.handlers.resource.FileResourceManager(File(".")) {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
-        if (VaadinApplication.debugResources) {
+        if (debug) {
             println("REQUEST static: $path")
         }
 
         val url = trie[path] ?: return null
 
-        if (VaadinApplication.debugResources) {
+        if (debug) {
             println("TRIE: $url")
         }
 

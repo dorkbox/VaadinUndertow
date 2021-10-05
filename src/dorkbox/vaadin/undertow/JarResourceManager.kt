@@ -15,7 +15,6 @@
  */
 package dorkbox.vaadin.undertow
 
-import dorkbox.vaadin.VaadinApplication
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.undertow.UndertowMessages
 import io.undertow.server.handlers.resource.Resource
@@ -32,17 +31,17 @@ import java.net.URL
  * @author Andy Wilkinson
  * @author Dorkbox LLC
  */
-internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<URL>) : ResourceManager {
+internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val debug: Boolean) : ResourceManager {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
-        if (VaadinApplication.debugResources) {
+        if (debug) {
             println("REQUEST jar: $path")
         }
 
         val url = trie[path] ?: return null
 
-        if (VaadinApplication.debugResources) {
+        if (debug) {
             println("TRIE: $url")
         }
 
