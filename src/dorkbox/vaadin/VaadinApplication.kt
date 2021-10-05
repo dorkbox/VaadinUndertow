@@ -1,10 +1,10 @@
 package dorkbox.vaadin
 
-import com.vaadin.flow.server.VaadinServlet
 import com.vaadin.flow.server.frontend.FrontendUtils
 import dorkbox.vaadin.devMode.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
+import dorkbox.vaadin.util.TrieClassLoader
 import dorkbox.vaadin.util.VaadinConfig
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.github.classgraph.ClassGraph
@@ -19,6 +19,7 @@ import io.undertow.server.handlers.cache.DirectBufferCache
 import io.undertow.server.handlers.resource.CachingResourceManager
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.servlet.Servlets
+import io.undertow.servlet.api.ExceptionHandler
 import io.undertow.servlet.api.ServletContainerInitializerInfo
 import io.undertow.servlet.api.ServletInfo
 import io.undertow.servlet.api.ServletSessionConfig
@@ -30,14 +31,11 @@ import org.xnio.Xnio
 import org.xnio.XnioWorker
 import java.io.File
 import java.net.URL
-import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
-import javax.servlet.Servlet
-import javax.servlet.ServletContainerInitializer
-import javax.servlet.SessionTrackingMode
+import javax.servlet.*
 import javax.servlet.annotation.HandlesTypes
 import kotlin.reflect.KClass
 
@@ -45,14 +43,12 @@ import kotlin.reflect.KClass
 /**
  * Loads, Configures, and Starts a Vaadin 14 application
  */
-class VaadinApplication() {
+class VaadinApplication : ExceptionHandler {
     companion object {
-        const val debugResources = false
-
         /**
          * Gets the version number.
          */
-        const val version = "14.0"
+        const val version = "14.7"
 
         init {
             // Add this project to the updates system, which verifies this class + UUID + version information
@@ -69,16 +65,25 @@ class VaadinApplication() {
 
     val vaadinConfig: VaadinConfig
 
-    private lateinit var urlClassLoader: URLClassLoader
+    private lateinit var trieClassLoader: TrieClassLoader
     private lateinit var resourceCollectionManager: ResourceCollectionManager
 
     private val resources = ArrayList<ResourceManager>()
 
-    private val exactResources = ArrayList<String>()
-    private val prefixResources = ArrayList<String>()
+//    private val exactResources = ArrayList<String>()
+//    private val prefixResources = ArrayList<String>()
+
+    private val originalClassLoader: ClassLoader
+
+
 
     private lateinit var cacheHandler: HttpHandler
     private lateinit var servletHttpHandler: HttpHandler
+
+    private lateinit var jarStringTrie: DoubleArrayTrie<String>
+    private lateinit var jarUrlTrie: DoubleArrayTrie<URL>
+    private lateinit var diskTrie: DoubleArrayTrie<URL>
+
 
     @Volatile
     private var undertowServer: Undertow? = null
@@ -87,8 +92,8 @@ class VaadinApplication() {
         // THIS code might be as a jar, however we want to test if the **TOP** leve; code that called this is running as a jar.
         runningAsJar = CallingClass.get().getResource("")!!.protocol == "jar"
 
-
         vaadinConfig = VaadinConfig(runningAsJar, tempDir)
+        originalClassLoader = Thread.currentThread().contextClassLoader
     }
 
     private fun addAnnotated(annotationScanner: ScanResult,
@@ -222,6 +227,7 @@ class VaadinApplication() {
             scanResultJarDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
+                val resourceUrl = resource.url
 
 //                // we only care about VAADIN and frontend resources for JARs -- everything else is compiled as part of the webpack process.
 //                val lower = relativePath.lowercase(Locale.US)
@@ -236,8 +242,11 @@ class VaadinApplication() {
                     logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
+                val path = resourceUrl.path
+                val resourceDir = path.substring(0, path.length - relativePath.length)
+
                 // these are all resources inside JAR files.
-                jarLocations.add(WebResourceString(relativePath, resource.classpathElementURL, resourcePath))
+                jarLocations.add(WebResourceString(relativePath, resource.classpathElementURL, resourcePath, URL(resourceDir)))
 
                 // jar file this resource is from -- BUT NOT THE RESOURCE ITSELF
                 urlClassLoader.add(resource.classpathElementURL)
@@ -252,6 +261,7 @@ class VaadinApplication() {
             scanResultJarDependencies.allResources.forEach { resource ->
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
+                val resourceUrl = resource.url
 
                 logger.debug { "Jar resource: $relativePath" }
                 if (lastFile != resource.classpathElementFile) {
@@ -259,8 +269,11 @@ class VaadinApplication() {
                     logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
+                val path = resourceUrl.path
+                val resourceDir = path.substring(0, path.length - relativePath.length)
+
                 // these are all resources inside JAR files.
-                jarLocations.add(WebResourceString(relativePath, resource.url, resourcePath))
+                jarLocations.add(WebResourceString(relativePath, resourceUrl, resourcePath, URL(resourceDir)))
 
                 // jar file this resource is from -- BUT NOT THE RESOURCE ITSELF
                 urlClassLoader.add(resource.classpathElementURL)
@@ -329,43 +342,25 @@ class VaadinApplication() {
         }
 
         // EVERYTHING IS ACCESSED VIA TRIE, NOT VIA HASHMAP! (it's faster this way)
-        val jarStringTrie = DoubleArrayTrie(jarStringResourceRequestMap)
-        val jarUrlTrie = DoubleArrayTrie(jarUrlResourceRequestMap)
-        val diskTrie = DoubleArrayTrie(diskResourceRequestMap)
+        jarStringTrie = DoubleArrayTrie(jarStringResourceRequestMap)
+        jarUrlTrie = DoubleArrayTrie(jarUrlResourceRequestMap)
+        diskTrie = DoubleArrayTrie(diskResourceRequestMap)
 
-                                                                                    //URL Classloader: META-INF/VAADIN/build/vaadin-bundle-4d7dbedf0dba552475bc.cache.js
+
+        // file:/D:/Code/dorkbox/private_projects/undertow-officialExample/build/resources/main/VAADIN/config/stats.json
+//URL Classloader: META-INF/VAADIN/build/vaadin-bundle-4d7dbedf0dba552475bc.cache.js
         // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
         // NOTE: this will load the stats.json file!
-        val toTypedArray = jarLocations.map { it.resourcePath }.toTypedArray()
-        this.urlClassLoader = object : URLClassLoader(toTypedArray, this.javaClass.classLoader) {
-            override fun getResource(name: String): URL? {
-                if (debugResources) {
-                    println(" URL Classloader: $name")
-                }
 
-                // check disk first
-                val diskResourcePath: URL? = diskTrie[name]
-                if (diskResourcePath != null) {
-                    if (debugResources) {
-                        println("TRIE: $diskResourcePath")
-                    }
-                    return diskResourcePath
-                }
+        // for our classloader, we have to make sure that we are BY DIRECTORY, not by file, for the resource array!
+        val toTypedArray = jarLocations.map { it.resourceDir }.toSet().toTypedArray()
+        this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, vaadinConfig.debug)
 
-                val jarResourcePath: String? = jarStringTrie[name]
-                if (jarResourcePath != null) {
-                    if (debugResources) {
-                        println("TRIE: $jarResourcePath")
-                    }
-                    return super.getResource(jarResourcePath)
-                }
+        // we want to start ALL aspects of the application using our NEW classloader (instead of the "current" classloader)
+        Thread.currentThread().contextClassLoader = this.trieClassLoader
 
-                return super.getResource(name)
-            }
-        }
-
-        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie)
-        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie)
+        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, vaadinConfig.debug)
+        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, vaadinConfig.debug)
 
 //        val jarResources = ArrayList<JarResourceManager>()
 //        jarLocations.forEach { (requestPath, resourcePath, relativeResourcePath) ->
@@ -499,7 +494,7 @@ class VaadinApplication() {
     }
 
     fun initServlet(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int,
-                    servletClass: Class<out Servlet> = VaadinServlet::class.java,
+                    servletClass: Class<out Servlet> = com.vaadin.flow.server.VaadinServlet::class.java,
                     servletName: String = "Vaadin",
                     servletConfig: ServletInfo.() -> Unit = {},
                     undertowConfig: Undertow.Builder.() -> Unit) {
@@ -527,6 +522,28 @@ class VaadinApplication() {
         })
 
 
+//        servletClass: Class<out Servlet> = VaadinServlet::class.java,
+        // we have to load the instance of the VaadinServlet INSIDE our url handler! (so all traffic/requests go through the url classloader!)
+//        val forceReloadClassLoader = object : ClassLoader(trieClassLoader) {
+//            override fun loadClass(name: String?, resolve: Boolean): Class<*> {
+//                if (name == servletClassName) {
+//                    throw ClassNotFoundException()
+////                    return trieClassLoader.findClass(name)
+//                }
+//
+//                return super.loadClass(name, resolve)
+//            }
+//        }
+//
+//        val forceReloadClassLoader2 = object : ClassLoader(forceReloadClassLoader) { }
+
+//        val servletClass = Class.forName(servletClassName, true, trieClassLoader) as Class<out Servlet>
+//        val cl = servletClass.classLoader
+
+//        val instance = servletClass.constructors[0].newInstance()
+//        val immediateInstanceFactory = ImmediateInstanceFactory(instance) as ImmediateInstanceFactory<out Servlet>
+
+
         val servlet = Servlets.servlet(servletName, servletClass)
             .setLoadOnStartup(1)
             .setAsyncSupported(true)
@@ -545,17 +562,18 @@ class VaadinApplication() {
         servletConfig(servlet)
 
         val servletBuilder = Servlets.deployment()
-                .setClassLoader(urlClassLoader)
+                .setClassLoader(trieClassLoader)
                 .setResourceManager(conditionalResourceManager)
                 .setDisplayName(servletName)
                 .setDefaultEncoding("UTF-8")
                 .setSecurityDisabled(true) // security is controlled in memory using vaadin
                 .setContextPath("/") // root context path
                 .setDeploymentName(servletName)
+                .setExceptionHandler(this)
                 .addServlets(servlet)
                 .setSessionPersistenceManager(FileSessionPersistence(tempDir))
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME, WebSocketDeploymentInfo())
-            .addServletContainerInitializers(listOf())
+                .addServletContainerInitializers(listOf())
 
         val sessionCookieName = ServletSessionConfig.DEFAULT_SESSION_ID
 
@@ -622,6 +640,7 @@ class VaadinApplication() {
         /////////////////////////////////////////////////////////////////
         val manager = Servlets.defaultContainer().addDeployment(servletBuilder)
         manager.deploy()
+
 
         // TODO: adjust the session timeout (default is 30 minutes) from when the LAST heartbeat is detected
         // manager.deployment.sessionManager.setDefaultSessionTimeout(TimeUnit.MINUTES.toSeconds(Args.webserver.sessionTimeout).toInt())
@@ -706,33 +725,54 @@ class VaadinApplication() {
     fun handleRequest(exchange: HttpServerExchange) {
         // dev-mode : incoming requests USUALLY start with a '/'
         val path = exchange.relativePath
-        if (debugResources) {
+        if (vaadinConfig.debug) {
             println("REQUEST undertow: $path")
         }
 
         // serve the following directly via the resource handler, so we can do it directly in the networking IO thread.
         // Because this is non-blocking, this is also the preferred way to do this for performance.
         // at the time of writing, this was "/icons", "/images", and in production mode "/VAADIN"
-        exactResources.forEach {
-            if (path == it) {
-                cacheHandler.handleRequest(exchange)
-                return
+
+        // our resource manager ONLY manages disk + jars!
+        val diskResourcePath: URL? = diskTrie[path]
+        if (diskResourcePath != null) {
+            if (vaadinConfig.debug) {
+                println("URL TRIE: $diskResourcePath")
             }
+            cacheHandler.handleRequest(exchange)
+            return
         }
 
-        prefixResources.forEach {
-            if (path.startsWith(it)) {
-                if (it == "/VAADIN" &&
-                    // Dynamic resources need to be handled by the default handler, not the cacheHandler.
-                    path[8] == 'd' && path[9] == 'y' && path[10] == 'n') {
-                        servletHttpHandler.handleRequest(exchange)
-                        return
-                }
-
-                cacheHandler.handleRequest(exchange)
-                return
+        val jarResourcePath: String? = jarStringTrie[path]
+        if (jarResourcePath != null) {
+            if (vaadinConfig.debug) {
+                println("URL TRIE: $jarResourcePath")
             }
+            cacheHandler.handleRequest(exchange)
+            return
         }
+
+
+//        exactResources.forEach {
+//            if (path == it) {
+//                cacheHandler.handleRequest(exchange)
+//                return
+//            }
+//        }
+
+//        prefixResources.forEach {
+//            if (path.startsWith(it)) {
+//                if (it == "/VAADIN" &&
+//                    // Dynamic resources need to be handled by the default handler, not the cacheHandler.
+//                    path[8] == 'd' && path[9] == 'y' && path[10] == 'n') {
+//                        servletHttpHandler.handleRequest(exchange)
+//                        return
+//                }
+//
+//                cacheHandler.handleRequest(exchange)
+//                return
+//            }
+//        }
 
         // this is the default, and will use coroutines + servlet to handle the request
         servletHttpHandler.handleRequest(exchange)
@@ -773,7 +813,7 @@ class VaadinApplication() {
         val exceptionThrown = AtomicReference<Exception>()
         val latch = CountDownLatch(1)
 
-        Thread(threadGroup) {
+        val thread = Thread(threadGroup) {
             try {
                 undertowServer?.start()
             } catch (e: Exception) {
@@ -781,9 +821,13 @@ class VaadinApplication() {
             } finally {
                 latch.countDown()
             }
-        }.start()
+        }
+        thread.contextClassLoader = this.trieClassLoader
+        thread.start()
 
         latch.await()
+
+        Thread.currentThread().contextClassLoader = this.originalClassLoader
 
         val exception = exceptionThrown.get()
         if (exception != null) {
@@ -812,5 +856,28 @@ class VaadinApplication() {
                 it.run()
             }
         }
+    }
+
+    /**
+     * Handles an exception. If this method returns true then the request/response cycle is considered to be finished,
+     * and no further action will take place, if this returns false then standard error page redirect will take place.
+     *
+     * The default implementation of this simply logs the exception and returns false, allowing error page and async context
+     * error handling to proceed as normal.
+     *
+     * @param exchange        The exchange
+     * @param request         The request
+     * @param response        The response
+     * @param throwable       The exception
+     * @return <code>true</code> true if the error was handled by this method
+     */
+    override fun handleThrowable(
+        exchange: HttpServerExchange?,
+        request: ServletRequest?,
+        response: ServletResponse?,
+        throwable: Throwable?
+    ): Boolean {
+        logger.error("Error ${request} : ${response}", throwable)
+        return false
     }
 }
