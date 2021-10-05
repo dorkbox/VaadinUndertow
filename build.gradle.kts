@@ -26,8 +26,8 @@ import java.time.Instant
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "2.13"
-    id("com.dorkbox.Licensing") version "2.9.2"
+    id("com.dorkbox.GradleUtils") version "2.14"
+    id("com.dorkbox.Licensing") version "2.10"
     id("com.dorkbox.VersionUpdate") version "2.4"
     id("com.dorkbox.GradlePublish") version "1.11"
 
@@ -39,7 +39,7 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "14.0"
+    const val version = "14.7"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -48,7 +48,7 @@ object Extras {
     val buildDate = Instant.now().toString()
 
     const val coroutineVer = "1.4.3"
-    const val vaadinVer = "14.4.8" // this must be synchronized with the gradle plugin
+    const val vaadinVer = "14.7.1" // this must be synchronized with the gradle plugin
     const val undertowVer = "2.2.10.Final"
 }
 
@@ -135,7 +135,7 @@ dependencies {
 
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    implementation("io.github.classgraph:classgraph:4.8.114")
+    implementation("io.github.classgraph:classgraph:4.8.116")
 
     implementation("com.dorkbox:Updates:1.1")
 
