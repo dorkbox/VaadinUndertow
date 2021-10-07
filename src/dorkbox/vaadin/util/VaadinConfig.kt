@@ -15,6 +15,7 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
     companion object {
         val EXTRACT_JAR = "extract.jar"
         val EXTRACT_JAR_OVERWRITE = "extract.jar.overwrite"
+        val DEBUG = "debug"
     }
 
     val tokenFileName: String
@@ -26,6 +27,9 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
 
     // option to force files to be overwritten when `extractFromJar` is true
     val forceExtractOverwrite: Boolean
+
+    // option to permit us to fully debug the vaadin application. This must be set during the token compile phase
+    val debug: Boolean
 
     init {
         // find the config/stats.json to see what mode (PRODUCTION or DEV) we should run in.
@@ -73,6 +77,7 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
         pNpmEnabled = tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_ENABLE_PNPM)
         extractFromJar = getBoolean(tokenJson, EXTRACT_JAR)
         forceExtractOverwrite = getBoolean(tokenJson, EXTRACT_JAR_OVERWRITE, false)
+        debug = getBoolean(tokenJson, EXTRACT_JAR_OVERWRITE, false)
 
         if (devMode && runningAsJar) {
             throw RuntimeException("Invalid run configuration. It is not possible to run DEV MODE from a deployed jar.\n" +
@@ -93,15 +98,21 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
         return if (tokenJson.hasKey(tokenName)) tokenJson.getBoolean(tokenName) else defaultValue
     }
 
-
     fun addServletInitParameters(servlet: ServletInfo) {
         servlet
             .addInitParam("productionMode", (!devMode).toString()) // this is set via the gradle build
 
             // have to say where our token file lives
             .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
+    }
 
-            // where our stats.json file lives. This loads via classloader, not via a file!!
-            .addInitParam(InitParameters.SERVLET_PARAMETER_STATISTICS_JSON, "VAADIN/config/stats.json")
+    fun setupStatsJsonUrl(servlet: ServletInfo, url: String) {
+        // load the stats file as a URL, NOT via the classloader!
+        // this is because in java9+, the classpath/module "mess" complicates the accessibility of this file.
+
+        // the stats.json http request will be coming from the local box (so everything is local. Only when on a specific IP should that specific IP be used)
+        servlet
+            .addInitParam(InitParameters.EXTERNAL_STATS_FILE, "true")
+            .addInitParam(InitParameters.EXTERNAL_STATS_URL, "$url/VAADIN/config/stats.json")
     }
 }

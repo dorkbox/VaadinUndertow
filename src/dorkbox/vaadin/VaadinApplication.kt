@@ -5,6 +5,7 @@ import dorkbox.vaadin.devMode.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.TrieClassLoader
+import dorkbox.vaadin.util.UndertowBuilder
 import dorkbox.vaadin.util.VaadinConfig
 import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.github.classgraph.ClassGraph
@@ -19,13 +20,8 @@ import io.undertow.server.handlers.cache.DirectBufferCache
 import io.undertow.server.handlers.resource.CachingResourceManager
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.servlet.Servlets
-import io.undertow.servlet.api.ExceptionHandler
-import io.undertow.servlet.api.ServletContainerInitializerInfo
-import io.undertow.servlet.api.ServletInfo
-import io.undertow.servlet.api.ServletSessionConfig
+import io.undertow.servlet.api.*
 import io.undertow.websockets.jsr.WebSocketDeploymentInfo
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import org.xnio.Xnio
 import org.xnio.XnioWorker
@@ -33,6 +29,7 @@ import java.io.File
 import java.net.URL
 import java.util.*
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.servlet.*
@@ -43,6 +40,7 @@ import kotlin.reflect.KClass
 /**
  * Loads, Configures, and Starts a Vaadin 14 application
  */
+@Suppress("unused")
 class VaadinApplication : ExceptionHandler {
     companion object {
         /**
@@ -79,10 +77,18 @@ class VaadinApplication : ExceptionHandler {
 
     private lateinit var cacheHandler: HttpHandler
     private lateinit var servletHttpHandler: HttpHandler
+    private lateinit var servletManager: DeploymentManager
 
     private lateinit var jarStringTrie: DoubleArrayTrie<String>
     private lateinit var jarUrlTrie: DoubleArrayTrie<URL>
     private lateinit var diskTrie: DoubleArrayTrie<URL>
+
+    private lateinit var servletBuilder: DeploymentInfo
+    private lateinit var serverBuilder: UndertowBuilder
+    private lateinit var servlet: ServletInfo
+
+    /** This url is used to define what the base url is for accessing the Vaadin stats.json file */
+    lateinit var baseUrl: String
 
 
     @Volatile
@@ -497,7 +503,7 @@ class VaadinApplication : ExceptionHandler {
                     servletClass: Class<out Servlet> = com.vaadin.flow.server.VaadinServlet::class.java,
                     servletName: String = "Vaadin",
                     servletConfig: ServletInfo.() -> Unit = {},
-                    undertowConfig: Undertow.Builder.() -> Unit) {
+                    undertowConfig: UndertowBuilder.() -> Unit) {
 
 
         resourceCollectionManager = ResourceCollectionManager(resources)
@@ -522,6 +528,27 @@ class VaadinApplication : ExceptionHandler {
         })
 
 
+
+        // directly serve our static requests in the IO thread (and not in a worker/coroutine)
+        val staticResourceHandler = DirectResourceHandler(resourceCollectionManager)
+        if (enableCachedHandlers) {
+            staticResourceHandler.setCacheTime(cacheTimeoutSeconds)  // tell the browser to cache our static resources (in seconds)
+        }
+
+        cacheHandler = when {
+            enableCachedHandlers -> {
+                val cache = DirectBufferCache(1024, 10, 1024 * 1024 * 200)
+                CacheHandler(cache, staticResourceHandler)
+            }
+            else -> {
+                // sometimes it is really hard to debug when using the cache
+                staticResourceHandler
+            }
+        }
+
+
+
+
 //        servletClass: Class<out Servlet> = VaadinServlet::class.java,
         // we have to load the instance of the VaadinServlet INSIDE our url handler! (so all traffic/requests go through the url classloader!)
 //        val forceReloadClassLoader = object : ClassLoader(trieClassLoader) {
@@ -543,11 +570,14 @@ class VaadinApplication : ExceptionHandler {
 //        val instance = servletClass.constructors[0].newInstance()
 //        val immediateInstanceFactory = ImmediateInstanceFactory(instance) as ImmediateInstanceFactory<out Servlet>
 
+        val threadGroup = ThreadGroup("Web Server")
+        val executor = Executors.newCachedThreadPool(DaemonThreadFactory("HttpWrapper", threadGroup))
 
-        val servlet = Servlets.servlet(servletName, servletClass)
+
+        servlet = Servlets.servlet(servletName, servletClass)
             .setLoadOnStartup(1)
             .setAsyncSupported(true)
-            .setExecutor(null) // we use coroutines!
+            .setExecutor(executor)
 
             // have to say where our NPM/dev mode files live.
             .addInitParam(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
@@ -561,37 +591,39 @@ class VaadinApplication : ExceptionHandler {
         // setup (or change) custom config options (
         servletConfig(servlet)
 
-        val servletBuilder = Servlets.deployment()
-                .setClassLoader(trieClassLoader)
-                .setResourceManager(conditionalResourceManager)
-                .setDisplayName(servletName)
-                .setDefaultEncoding("UTF-8")
-                .setSecurityDisabled(true) // security is controlled in memory using vaadin
-                .setContextPath("/") // root context path
-                .setDeploymentName(servletName)
-                .setExceptionHandler(this)
-                .addServlets(servlet)
-                .setSessionPersistenceManager(FileSessionPersistence(tempDir))
-                .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME, WebSocketDeploymentInfo())
-                .addServletContainerInitializers(listOf())
+        servletBuilder = Servlets.deployment()
+            .setClassLoader(trieClassLoader)
+            .setResourceManager(conditionalResourceManager)
+            .setDisplayName(servletName)
+            .setDefaultEncoding("UTF-8")
+            .setSecurityDisabled(true) // security is controlled in memory using vaadin
+            .setContextPath("/") // root context path
+            .setDeploymentName(servletName)
+            .setExceptionHandler(this)
+            .addServlets(servlet)
+            .setSessionPersistenceManager(FileSessionPersistence(tempDir))
+            .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME, WebSocketDeploymentInfo())
+            .addServletContainerInitializers(listOf())
 
         val sessionCookieName = ServletSessionConfig.DEFAULT_SESSION_ID
 
-        // use the created actor
-        // FIXME: 8 actors and 2 threads concurrency on the actor map?
-        val coroutineHttpWrapper = CoroutineHttpWrapper(sessionCookieName, 8, 2)
+//        // use the created actor
+//        // FIXME: 8 actors and 2 threads concurrency on the actor map?
+//        val coroutineHttpWrapper = CoroutineHttpWrapper(sessionCookieName, 8, 2)
+//
+//        onStopList.add(Runnable {
+//            // launch new coroutine in background and continue, since we want to stop our http wrapper in a different coroutine!
+//            GlobalScope.launch {
+//                coroutineHttpWrapper.stop()
+//            }
+//        })
+//
+//        servletBuilder.initialHandlerChainWrappers.add(coroutineHttpWrapper)
+//
+//        // destroy the actors on session invalidation
+//        servletBuilder.addSessionListener(ActorSessionCleanup(coroutineHttpWrapper.actorsPerSession))
 
-        onStopList.add(Runnable {
-            // launch new coroutine in background and continue, since we want to stop our http wrapper in a different coroutine!
-            GlobalScope.launch {
-                coroutineHttpWrapper.stop()
-            }
-        })
 
-        servletBuilder.initialHandlerChainWrappers.add(coroutineHttpWrapper)
-
-        // destroy the actors on session invalidation
-        servletBuilder.addSessionListener(ActorSessionCleanup(coroutineHttpWrapper.actorsPerSession))
 
         // configure how the servlet behaves
         val servletSessionConfig = ServletSessionConfig()
@@ -634,40 +666,6 @@ class VaadinApplication : ExceptionHandler {
             }
         }
 
-
-        /////////////////////////////////////////////////////////////////
-        // INITIALIZING AND STARTING THE SERVLET
-        /////////////////////////////////////////////////////////////////
-        val manager = Servlets.defaultContainer().addDeployment(servletBuilder)
-        manager.deploy()
-
-
-        // TODO: adjust the session timeout (default is 30 minutes) from when the LAST heartbeat is detected
-        // manager.deployment.sessionManager.setDefaultSessionTimeout(TimeUnit.MINUTES.toSeconds(Args.webserver.sessionTimeout).toInt())
-        servletHttpHandler = manager.start()
-
-
-
-
-
-        // NOTE: look into SessionRestoringHandler to keep session state across re-deploys (this is normally not used in production). this might just be tricks with classloaders to keep sessions around
-        // we also want to save sessions to disk, and be able to read from them if we want See InMemorySessionManager (we would have to write our own)
-
-        /*
-         * look at the following
-         * GracefulShutdownHandler
-         * LearningPushHandler
-         * RedirectHandler
-         * RequestLimitingHandler
-         * SecureCookieHandler
-         *
-         *
-         * to setup ALPN and ssl, it's FASTER to use openssl instead of java
-         * http://wildfly.org/news/2017/10/06/OpenSSL-Support-In-Wildfly/
-         * https://github.com/undertow-io/undertow/blob/master/core/src/main/java/io/undertow/protocols/alpn/OpenSSLAlpnProvider.java
-         */
-
-
         if (vaadinConfig.devMode) {
             // NOTE: The vaadin flow files only exist AFTER vaadin is initialized, so this block MUST be after 'manager.deploy()'
             // in dev mode, the local resources are hardcoded to an **INCORRECT** location. They
@@ -682,28 +680,7 @@ class VaadinApplication : ExceptionHandler {
             File("frontend").absoluteFile.copyRecursively(targetDir, true)
         }
 
-
-        // directly serve our static requests in the IO thread (and not in a worker/coroutine)
-        val staticResourceHandler = DirectResourceHandler(resourceCollectionManager)
-        if (enableCachedHandlers) {
-            staticResourceHandler.setCacheTime(cacheTimeoutSeconds)  // tell the browser to cache our static resources (in seconds)
-        }
-
-        cacheHandler = when {
-            enableCachedHandlers -> {
-                val cache = DirectBufferCache(1024, 10, 1024 * 1024 * 200)
-                CacheHandler(cache, staticResourceHandler)
-            }
-            else -> {
-                // sometimes it is really hard to debug when using the cache
-                staticResourceHandler
-            }
-        }
-
-
-        val serverBuilder: Undertow.Builder = Undertow.builder()
-            // Max 1 because we immediately hand off to a coroutine handler
-            .setWorkerThreads(1)
+        serverBuilder = UndertowBuilder()
             .setSocketOption(org.xnio.Options.BACKLOG, 10000)
 
             // Let the server workers have time to close when we shutdown
@@ -719,66 +696,30 @@ class VaadinApplication : ExceptionHandler {
         // configure or override options
         undertowConfig(serverBuilder)
 
-        undertowServer = serverBuilder.build()
+
+
+        // setup the base URL from the server builder
+        val (isHttps, host, port) = serverBuilder.httpListener
+        val transport = if (isHttps) {
+            "https://"
+        } else {
+            "http://"
+        }
+
+        val hostInfo = if (host == "0.0.0.0") {
+            "127.0.0.1"
+        } else {
+            host
+        }
+
+        val portInfo = when {
+            isHttps && port == 443 -> ""
+            !isHttps && port == 80 -> ""
+            else -> ":$port"
+        }
+
+        baseUrl = "$transport$hostInfo$portInfo"
     }
-
-    fun handleRequest(exchange: HttpServerExchange) {
-        // dev-mode : incoming requests USUALLY start with a '/'
-        val path = exchange.relativePath
-        if (vaadinConfig.debug) {
-            println("REQUEST undertow: $path")
-        }
-
-        // serve the following directly via the resource handler, so we can do it directly in the networking IO thread.
-        // Because this is non-blocking, this is also the preferred way to do this for performance.
-        // at the time of writing, this was "/icons", "/images", and in production mode "/VAADIN"
-
-        // our resource manager ONLY manages disk + jars!
-        val diskResourcePath: URL? = diskTrie[path]
-        if (diskResourcePath != null) {
-            if (vaadinConfig.debug) {
-                println("URL TRIE: $diskResourcePath")
-            }
-            cacheHandler.handleRequest(exchange)
-            return
-        }
-
-        val jarResourcePath: String? = jarStringTrie[path]
-        if (jarResourcePath != null) {
-            if (vaadinConfig.debug) {
-                println("URL TRIE: $jarResourcePath")
-            }
-            cacheHandler.handleRequest(exchange)
-            return
-        }
-
-
-//        exactResources.forEach {
-//            if (path == it) {
-//                cacheHandler.handleRequest(exchange)
-//                return
-//            }
-//        }
-
-//        prefixResources.forEach {
-//            if (path.startsWith(it)) {
-//                if (it == "/VAADIN" &&
-//                    // Dynamic resources need to be handled by the default handler, not the cacheHandler.
-//                    path[8] == 'd' && path[9] == 'y' && path[10] == 'n') {
-//                        servletHttpHandler.handleRequest(exchange)
-//                        return
-//                }
-//
-//                cacheHandler.handleRequest(exchange)
-//                return
-//            }
-//        }
-
-        // this is the default, and will use coroutines + servlet to handle the request
-        servletHttpHandler.handleRequest(exchange)
-    }
-
-
 
     ////
     ////
@@ -803,6 +744,39 @@ class VaadinApplication : ExceptionHandler {
         }
 
     fun start() {
+        vaadinConfig.setupStatsJsonUrl(servlet, baseUrl)
+        undertowServer = serverBuilder.build()
+
+        /////////////////////////////////////////////////////////////////
+        // INITIALIZING AND STARTING THE SERVLET
+        /////////////////////////////////////////////////////////////////
+        servletManager = Servlets.defaultContainer().addDeployment(servletBuilder)
+        servletManager.deploy()
+
+
+        // TODO: adjust the session timeout (default is 30 minutes) from when the LAST heartbeat is detected
+        // manager.deployment.sessionManager.setDefaultSessionTimeout(TimeUnit.MINUTES.toSeconds(Args.webserver.sessionTimeout).toInt())
+        servletHttpHandler = servletManager.start()
+
+
+        // NOTE: look into SessionRestoringHandler to keep session state across re-deploys (this is normally not used in production). this might just be tricks with classloaders to keep sessions around
+        // we also want to save sessions to disk, and be able to read from them if we want See InMemorySessionManager (we would have to write our own)
+
+        /*
+         * look at the following
+         * GracefulShutdownHandler
+         * LearningPushHandler
+         * RedirectHandler
+         * RequestLimitingHandler
+         * SecureCookieHandler
+         *
+         *
+         * to setup ALPN and ssl, it's FASTER to use openssl instead of java
+         * http://wildfly.org/news/2017/10/06/OpenSSL-Support-In-Wildfly/
+         * https://github.com/undertow-io/undertow/blob/master/core/src/main/java/io/undertow/protocols/alpn/OpenSSLAlpnProvider.java
+         */
+
+
         val threadGroup = ThreadGroup("Undertow Web Server")
 
         // NOTE: we start this in a NEW THREAD so we can create and use a thread-group for all of the undertow threads created. This allows
@@ -837,7 +811,12 @@ class VaadinApplication : ExceptionHandler {
 
     fun stop() {
         try {
+            servletManager.stop()
+        } catch (e: Exception) {
+            // ignored
+        }
 
+        try {
             // servletBridge.shutdown();
             // serverChannel.close().awaitUninterruptibly();
             // bootstrap.releaseExternalResources();
@@ -856,6 +835,47 @@ class VaadinApplication : ExceptionHandler {
                 it.run()
             }
         }
+    }
+
+    fun handleRequest(exchange: HttpServerExchange) {
+        // dev-mode : incoming requests USUALLY start with a '/'
+        val path = exchange.relativePath
+        val debug = vaadinConfig.debug
+
+        if (debug) {
+            println("REQUEST undertow: $path")
+        }
+
+        if (path.length == 1) {
+            servletHttpHandler.handleRequest(exchange)
+            return
+        }
+
+        // serve the following directly via the resource handler, so we can do it directly in the networking IO thread.
+        // Because this is non-blocking, this is also the preferred way to do this for performance.
+        // at the time of writing, this was "/icons", "/images", and in production mode "/VAADIN"
+
+        // our resource manager ONLY manages disk + jars!
+        val diskResourcePath: URL? = diskTrie[path]
+        if (diskResourcePath != null) {
+            if (debug) {
+                println("URL TRIE: $diskResourcePath")
+            }
+            cacheHandler.handleRequest(exchange)
+            return
+        }
+
+        val jarResourcePath: String? = jarStringTrie[path]
+        if (jarResourcePath != null) {
+            if (debug) {
+                println("URL TRIE: $jarResourcePath")
+            }
+            cacheHandler.handleRequest(exchange)
+            return
+        }
+
+        // this is the default, and will use the servlet to handle the request
+        servletHttpHandler.handleRequest(exchange)
     }
 
     /**
