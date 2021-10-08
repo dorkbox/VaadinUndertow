@@ -13,6 +13,9 @@ import java.io.File
  */
 class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
     companion object {
+        // this must match the version information in the build.gradle.kts file
+        const val VAADIN_VERSION = "14.7.1"
+
         val EXTRACT_JAR = "extract.jar"
         val EXTRACT_JAR_OVERWRITE = "extract.jar.overwrite"
         val DEBUG = "debug"

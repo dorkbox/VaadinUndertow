@@ -48,6 +48,8 @@ class VaadinApplication : ExceptionHandler {
          */
         const val version = "14.7"
 
+        const val vaadinVersion = VaadinConfig.VAADIN_VERSION
+
         init {
             // Add this project to the updates system, which verifies this class + UUID + version information
             dorkbox.updates.Updates.add(VaadinApplication::class.java, "fc74a52b08c8410fabfea67ac5dca566", version)

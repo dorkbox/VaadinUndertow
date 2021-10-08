@@ -48,7 +48,9 @@ object Extras {
     val buildDate = Instant.now().toString()
 
     const val coroutineVer = "1.4.3"
-    const val vaadinVer = "14.7.1" // this must be synchronized with the gradle plugin
+
+    // this must match the version information in the VaadinConfig.kt file (this is automatically passed into the plugin)
+    const val vaadinVer = "14.7.1"
     const val undertowVer = "2.2.10.Final"
 }
 
