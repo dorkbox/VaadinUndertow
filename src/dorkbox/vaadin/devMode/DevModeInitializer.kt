@@ -25,6 +25,7 @@ import com.vaadin.flow.function.DeploymentConfiguration
 import com.vaadin.flow.router.HasErrorParameter
 import com.vaadin.flow.router.Route
 import com.vaadin.flow.server.*
+import com.vaadin.flow.server.DevModeHandler
 import com.vaadin.flow.server.frontend.FrontendUtils
 import com.vaadin.flow.server.frontend.NodeTasks
 import com.vaadin.flow.server.startup.ClassLoaderAwareServletContainerInitializer
@@ -44,6 +45,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.Executor
@@ -55,7 +57,7 @@ import javax.servlet.annotation.HandlesTypes
 import javax.servlet.annotation.WebListener
 
 /**
- * THIS IS COPIED DIRECTLY FROM VAADIN 14.6.8 (flow 2.4.6)
+ * THIS IS COPIED DIRECTLY FROM VAADIN 14.7.1 (flow 2.7.1)
  *
  * CHANGES FROM DEFAULT ARE MANAGED AS DIFFERENT REVISIONS.
  *
@@ -65,9 +67,11 @@ import javax.servlet.annotation.WebListener
  *
  *
  *
- *
  * Servlet initializer starting node updaters as well as the webpack-dev-mode
  * server.
+ *
+ *
+ * For internal use only. May be renamed or removed in a future release.
  *
  * @since 2.0
  */
@@ -91,6 +95,61 @@ import javax.servlet.annotation.WebListener
 )
 @WebListener
 class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializable, ServletContextListener {
+    @Throws(ServletException::class)
+    override fun process(classes: Set<Class<*>?>?, context: ServletContext) {
+        val registrations: Collection<ServletRegistration> = context.servletRegistrations.values
+        var vaadinServletRegistration: ServletRegistration? = null
+
+        for (registration in registrations) {
+            if (registration.className != null
+                && isVaadinServletSubClass(registration.className)
+            ) {
+                vaadinServletRegistration = registration
+                break
+            }
+        }
+
+        val config: DeploymentConfiguration
+        config = if (vaadinServletRegistration != null) {
+            StubServletConfig.createDeploymentConfiguration(
+                context,
+                vaadinServletRegistration, VaadinServlet::class.java
+            )
+        } else {
+            StubServletConfig.createDeploymentConfiguration(
+                context,
+                VaadinServlet::class.java
+            )
+        }
+
+        initDevModeHandler(classes, context, config)
+    }
+
+    private fun isVaadinServletSubClass(className: String): Boolean {
+        return try {
+            VaadinServlet::class.java.isAssignableFrom(Class.forName(className))
+        } catch (exception: ClassNotFoundException) { // NOSONAR
+            log().debug(
+                String.format(
+                    "Servlet class name (%s) can't be found!",
+                    className
+                )
+            )
+            false
+        }
+    }
+
+    override fun contextInitialized(ctx: ServletContextEvent) {
+        // No need to do anything on init
+    }
+
+    override fun contextDestroyed(ctx: ServletContextEvent) {
+        val handler = DevModeHandler.getDevModeHandler()
+        if (handler != null && !handler.reuseDevServer()) {
+            handler.stop()
+        }
+    }
+
     companion object {
         private val JAR_FILE_REGEX = Pattern.compile(".*file:(.+\\.jar).*")
 
@@ -105,11 +164,10 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
         private val DIR_REGEX_FRONTEND_DEFAULT = Pattern.compile("^(?:file:0)?(.+)" + Constants.RESOURCES_FRONTEND_DEFAULT + "/?$")
 
         // allow trailing slash
-        private val DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT = Pattern.compile(
-            "^(?:file:)?(.+)"
-                    + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
-                    + "/?$"
-        )
+        private val DIR_REGEX_RESOURCES_JAR_DEFAULT = Pattern.compile("^(?:file:0)?(.+)" + Constants.RESOURCES_THEME_JAR_DEFAULT+ "/?$")
+
+        // allow trailing slash
+        private val DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT = Pattern.compile("^(?:file:)?(.+)" + Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT+ "/?$")
 
         /**
          * Initialize the devmode server if not in production mode or compatibility
@@ -127,7 +185,6 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
          */
         @Throws(ServletException::class)
         fun initDevModeHandler(classes: Set<Class<*>?>?, context: ServletContext?, config: DeploymentConfiguration) {
-            System.err.println("CUSTOM INIT!")
             if (config.isProductionMode) {
                 log().debug("Skipping DEV MODE because PRODUCTION MODE is set.")
                 return
@@ -142,15 +199,20 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
             }
 
             // these are BOTH set by VaadinApplication.kt
-            val baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, File("").absolutePath)
+            var baseDir = config.getStringProperty(FrontendUtils.PROJECT_BASEDIR, null)
+            if (baseDir == null) {
+                baseDir = baseDirectoryFallback
+            }
+
             val generatedDir = System.getProperty(FrontendUtils.PARAM_GENERATED_DIR, FrontendUtils.DEFAULT_GENERATED_DIR)
-            val frontendFolder = config.getStringProperty(
-                FrontendUtils.PARAM_FRONTEND_DIR,
-                System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
+            val frontendFolder = config.getStringProperty(FrontendUtils.PARAM_FRONTEND_DIR,
+                                                          System.getProperty(FrontendUtils.PARAM_FRONTEND_DIR, FrontendUtils.DEFAULT_FRONTEND_DIR))
 
-
-
-            val builder = NodeTasks.Builder(DevModeClassFinder(classes), File(baseDir), File(generatedDir), File(frontendFolder))
+            val builder = NodeTasks.Builder(
+                DevModeClassFinder(classes),
+                File(baseDir), File(generatedDir),
+                File(frontendFolder)
+            )
 
             log().info("Starting dev-mode updaters in {} folder.", builder.npmFolder)
             if (!builder.generatedFolder.exists()) {
@@ -168,11 +230,8 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
             }
             val generatedPackages = File(builder.generatedFolder, Constants.PACKAGE_JSON)
 
-            // If we are missing the generated webpack configuration then generate
-            // webpack configurations
-            if (!File(builder.npmFolder, FrontendUtils.WEBPACK_GENERATED).exists()) {
-                builder.withWebpack(builder.npmFolder, FrontendUtils.WEBPACK_CONFIG, FrontendUtils.WEBPACK_GENERATED)
-            }
+            // Always update to auto-generated webpack configuration
+            builder.withWebpack(builder.npmFolder, FrontendUtils.WEBPACK_CONFIG, FrontendUtils.WEBPACK_GENERATED)
 
             // If we are missing either the base or generated package json files
             // generate those
@@ -180,7 +239,9 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                 builder.createMissingPackageJson(true)
             }
 
-            val frontendLocations = getFrontendLocationsFromClassloader(DevModeInitializer::class.java.classLoader)
+            val frontendLocations = getFrontendLocationsFromClassloader(
+                DevModeInitializer::class.java.classLoader
+            )
             val useByteCodeScanner = config.getBooleanProperty(
                 InitParameters.SERVLET_PARAMETER_DEVMODE_OPTIMIZE_BUNDLE,
                 java.lang.Boolean.parseBoolean(
@@ -190,7 +251,6 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                     )
                 )
             )
-
             val enablePnpm = config.isPnpmEnabled
             val useHomeNodeExec = config.getBooleanProperty(InitParameters.REQUIRE_HOME_NODE_EXECUTABLE, false)
             val vaadinContext: VaadinContext = VaadinServletContext(context)
@@ -233,16 +293,12 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                 )
             }
 
-            val nodeTasksFuture =
-                if (service is Executor) {
-                    // if there is an executor use it to run the task
-                    CompletableFuture.runAsync(
-                        runnable,
-                        service as Executor?
-                    )
-                } else {
-                    CompletableFuture.runAsync(runnable)
-                }
+            val nodeTasksFuture = if (service is Executor) {
+                // if there is an executor use it to run the task
+                CompletableFuture.runAsync(runnable, service as Executor?)
+            } else {
+                CompletableFuture.runAsync(runnable)
+            }
 
             DevModeHandler.start(config, builder.npmFolder, nodeTasksFuture)
         }
@@ -251,10 +307,39 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
             return LoggerFactory.getLogger(DevModeInitializer::class.java)
         }
 
-        /*
+        /**
+         * Accept user.dir or cwd as a fallback only if the directory seems to be a
+         * Maven or Gradle project. Check to avoid cluttering server directories
+         * (see tickets #8249, #8403).
+         */
+        private val baseDirectoryFallback: String
+            private get() {
+                val baseDirCandidate = System.getProperty("user.dir", ".")
+                val path = Paths.get(baseDirCandidate)
+                return if (path.toFile().isDirectory
+                    && (path.resolve("pom.xml").toFile().exists()
+                            || path.resolve("build.gradle").toFile().exists())
+                ) {
+                    path.toString()
+                } else {
+                    throw IllegalStateException(
+                        String.format(
+                            "Failed to determine project directory for dev mode. "
+                                    + "Directory '%s' does not look like a Maven or "
+                                    + "Gradle project. Ensure that you have run the "
+                                    + "prepare-frontend Maven goal, which generates "
+                                    + "'flow-build-info.json', prior to deploying your "
+                                    + "application",
+                            path.toString()
+                        )
+                    )
+                }
+            }
+
+        /**
          * This method returns all folders of jar files having files in the
-         * META-INF/resources/frontend folder. We don't use URLClassLoader because
-         * will fail in Java 9+
+         * META-INF/resources/frontend and META-INF/resources/themes folder. We
+         * don't use URLClassLoader because will fail in Java 9+
          */
         @Throws(ServletException::class)
         fun getFrontendLocationsFromClassloader(classLoader: ClassLoader): Set<File> {
@@ -271,9 +356,14 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                     Constants.COMPATIBILITY_RESOURCES_FRONTEND_DEFAULT
                 )
             )
+            frontendFiles.addAll(
+                getFrontendLocationsFromClassloader(
+                    classLoader,
+                    Constants.RESOURCES_THEME_JAR_DEFAULT
+                )
+            )
             return frontendFiles
         }
-
 
         private fun runNodeTasks(vaadinContext: VaadinContext, tokenFileData: JsonObject, tasks: NodeTasks) {
             try {
@@ -289,7 +379,9 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
         }
 
         @Throws(ServletException::class)
-        private fun getFrontendLocationsFromClassloader(classLoader: ClassLoader, resourcesFolder: String): Set<File> {
+        private fun getFrontendLocationsFromClassloader(
+            classLoader: ClassLoader, resourcesFolder: String
+        ): Set<File> {
             val frontendFiles: MutableSet<File> = HashSet()
             try {
                 val en = classLoader.getResources(resourcesFolder) ?: return frontendFiles
@@ -302,6 +394,7 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                     val jarMatcher = JAR_FILE_REGEX.matcher(path)
                     val zipProtocolJarMatcher = ZIP_PROTOCOL_JAR_FILE_REGEX.matcher(path)
                     val dirMatcher = DIR_REGEX_FRONTEND_DEFAULT.matcher(path)
+                    val dirResourcesMatcher = DIR_REGEX_RESOURCES_JAR_DEFAULT.matcher(path)
                     val dirCompatibilityMatcher = DIR_REGEX_COMPATIBILITY_FRONTEND_DEFAULT.matcher(path)
                     val jarVfsMatcher = VFS_FILE_REGEX.matcher(urlString)
                     val dirVfsMatcher = VFS_DIRECTORY_REGEX.matcher(urlString)
@@ -312,10 +405,7 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                             getPhysicalFileOfJBossVfsJar(URL(vfsJar))
                         )
                     } else if (dirVfsMatcher.find()) {
-                        val vfsDirUrl = URL(
-                            urlString.substring(0,urlString.lastIndexOf(resourcesFolder)
-                            )
-                        )
+                        val vfsDirUrl = URL(urlString.substring(0, urlString.lastIndexOf(resourcesFolder)))
                         frontendFiles.add(getPhysicalFileOfJBossVfsDirectory(vfsDirUrl))
                     } else if (jarMatcher.find()) {
                         frontendFiles.add(File(jarMatcher.group(1)))
@@ -324,6 +414,8 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                         frontendFiles.add(File(zipProtocolJarMatcher.group(1)))
                     } else if (dirMatcher.find()) {
                         frontendFiles.add(File(dirMatcher.group(1)))
+                    } else if (dirResourcesMatcher.find()) {
+                        frontendFiles.add(File(dirResourcesMatcher.group(1)))
                     } else if (dirCompatibilityMatcher.find()) {
                         frontendFiles.add(File(dirCompatibilityMatcher.group(1)))
                     } else {
@@ -404,58 +496,13 @@ class DevModeInitializer : ClassLoaderAwareServletContainerInitializer, Serializ
                     if (!(isFileMethod.invoke(child) as Boolean)) continue
 
                     val relativePath = getPathNameRelativeToMethod.invoke(child, jarVirtualFile) as String
-
                     val inputStream = openStreamMethod.invoke(child) as InputStream
-
                     val zipEntry = ZipEntry(relativePath)
                     zipOutputStream.putNextEntry(zipEntry)
                     IOUtils.copy(inputStream, zipOutputStream)
                     zipOutputStream.closeEntry()
                 }
             }
-        }
-    }
-
-
-    @Throws(ServletException::class)
-    override fun process(classes: Set<Class<*>?>?, context: ServletContext) {
-        val registrations: Collection<ServletRegistration> = context.servletRegistrations.values
-        var vaadinServletRegistration: ServletRegistration? = null
-
-        for (registration in registrations) {
-            try {
-                if (registration.className != null && isVaadinServletSubClass(registration.className)) {
-                    vaadinServletRegistration = registration
-                    break
-                }
-            } catch (e: ClassNotFoundException) {
-                throw ServletException(String.format("Servlet class name (%s) can't be found!", registration.className), e)
-            }
-        }
-
-        val config =
-        if (vaadinServletRegistration != null) {
-            StubServletConfig.createDeploymentConfiguration(context, vaadinServletRegistration, VaadinServlet::class.java)
-        } else {
-            StubServletConfig.createDeploymentConfiguration(context, VaadinServlet::class.java)
-        }
-
-        initDevModeHandler(classes, context, config)
-    }
-
-    @Throws(ClassNotFoundException::class)
-    private fun isVaadinServletSubClass(className: String): Boolean {
-        return VaadinServlet::class.java.isAssignableFrom(Class.forName(className))
-    }
-
-    override fun contextInitialized(ctx: ServletContextEvent) {
-        // No need to do anything on init
-    }
-
-    override fun contextDestroyed(ctx: ServletContextEvent) {
-        val handler = DevModeHandler.devModeHandler
-        if (handler != null && !handler.reuseDevServer()) {
-            handler.stop()
         }
     }
 }
