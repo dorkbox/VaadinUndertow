@@ -209,17 +209,10 @@ class VaadinApplication : ExceptionHandler {
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-//                // we only care about VAADIN and frontend resources for JARs -- everything else is compiled as part of the webpack process.
-//                val lower = relativePath.lowercase(Locale.US)
-//                if (!lower.startsWith("vaadin") && !lower.startsWith("frontend")) {
-//                    logger.trace { "Skipping classpath resource: $relativePath" }
-//                    return@forEach
-//                }
-
-                logger.debug { "Jar resource: $relativePath"  }
+                logger.trace { "Jar resource: $relativePath"  }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.trace { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 // we should copy this resource out, since loading resources from jar files is time+memory intensive
@@ -230,7 +223,7 @@ class VaadinApplication : ExceptionHandler {
 //                if (!outputFile.exists()) {
                     val parentFile = outputFile.parentFile
                     if (!parentFile.isDirectory && !parentFile.mkdirs()) {
-                        logger.debug { "Unable to create output directory $parentFile" }
+                        logger.trace { "Unable to create output directory $parentFile" }
                     } else {
                         resource.open().use { input ->
                             outputFile.outputStream().use { input.copyTo(it) }
@@ -252,17 +245,10 @@ class VaadinApplication : ExceptionHandler {
                 val relativePath = resourcePath.substring(metaInfValLength)
                 val resourceUrl = resource.url
 
-//                // we only care about VAADIN and frontend resources for JARs -- everything else is compiled as part of the webpack process.
-//                val lower = relativePath.lowercase(Locale.US)
-//                if (!lower.startsWith("vaadin") && !lower.startsWith("frontend")) {
-//                    logger.trace { "Skipping JAR resource: $relativePath" }
-//                    return@forEach
-//                }
-
-                logger.debug { "Jar resource: $relativePath" }
+                logger.trace { "Jar resource: $relativePath" }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.trace { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 val path = resourceUrl.path
@@ -286,10 +272,10 @@ class VaadinApplication : ExceptionHandler {
                 val relativePath = resourcePath.substring(metaInfValLength)
                 val resourceUrl = resource.url
 
-                logger.debug { "Jar resource: $relativePath" }
+                logger.trace { "Jar resource: $relativePath" }
                 if (lastFile != resource.classpathElementFile) {
                     lastFile = resource.classpathElementFile
-                    logger.debug { "Jar resource: ${resource.classpathElementFile}"  }
+                    logger.trace { "Jar resource: ${resource.classpathElementFile}"  }
                 }
 
                 val path = resourceUrl.path
@@ -307,7 +293,7 @@ class VaadinApplication : ExceptionHandler {
                 val resourcePath = resource.pathRelativeToClasspathElement
                 val relativePath = resourcePath.substring(metaInfValLength)
 
-                logger.debug { "Local resource: $relativePath" }
+                logger.trace { "Local resource: $relativePath" }
 
                 diskLocations.add(WebResource(relativePath, resource.url))
             }
@@ -370,8 +356,6 @@ class VaadinApplication : ExceptionHandler {
         diskTrie = DoubleArrayTrie(diskResourceRequestMap)
 
 
-        // file:/D:/Code/dorkbox/private_projects/undertow-officialExample/build/resources/main/VAADIN/config/stats.json
-//URL Classloader: META-INF/VAADIN/build/vaadin-bundle-4d7dbedf0dba552475bc.cache.js
         // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
         // NOTE: this will load the stats.json file!
 
