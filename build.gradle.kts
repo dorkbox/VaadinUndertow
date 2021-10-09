@@ -87,6 +87,13 @@ licensing {
             author("Bill O'Neil")
             url("https://github.com/StubbornJava/StubbornJava")
         }
+
+        extra("Pronghorn HTTP Server", License.APACHE_2) {
+            description("A low-level, high performance HTTP server")
+            copyright(2017)
+            author("Pronghorn Technology LLC")
+            url("https://github.com/pronghorn-tech/server")
+        }
     }
 }
 

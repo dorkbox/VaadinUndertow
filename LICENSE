@@ -21,6 +21,12 @@
        Copyright 2017
          Bill O'Neil
 
+     - Pronghorn HTTP Server - A low-level, high performance HTTP server
+       [The Apache Software License, Version 2.0]
+       https://github.com/pronghorn-tech/server
+       Copyright 2017
+         Pronghorn Technology LLC
+
      - Kotlin - 
        [The Apache Software License, Version 2.0]
        https://github.com/JetBrains/kotlin
