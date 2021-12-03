@@ -29,7 +29,7 @@ import java.io.File
 class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
     companion object {
         // this must match the version information in the build.gradle.kts file
-        const val VAADIN_VERSION = "14.7.1"
+        const val VAADIN_VERSION = "14.7.6"
 
         val EXTRACT_JAR = "extract.jar"
         val EXTRACT_JAR_OVERWRITE = "extract.jar.overwrite"
@@ -131,6 +131,6 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
         // the stats.json http request will be coming from the local box (so everything is local. Only when on a specific IP should that specific IP be used)
         servlet
             .addInitParam(InitParameters.EXTERNAL_STATS_FILE, "true")
-            .addInitParam(InitParameters.EXTERNAL_STATS_URL, "$url/VAADIN/config/stats.json")
+            .addInitParam(InitParameters.EXTERNAL_STATS_URL, "$url")
     }
 }

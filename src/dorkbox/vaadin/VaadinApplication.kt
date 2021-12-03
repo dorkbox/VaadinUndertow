@@ -41,6 +41,7 @@ import mu.KotlinLogging
 import org.xnio.Xnio
 import org.xnio.XnioWorker
 import java.io.File
+import java.io.IOException
 import java.net.URL
 import java.util.*
 import java.util.concurrent.CountDownLatch
@@ -72,6 +73,7 @@ class VaadinApplication : ExceptionHandler {
     }
 
     private val logger = KotlinLogging.logger {}
+    private val httpLogger = KotlinLogging.logger(logger.name + ".http")
 
     val runningAsJar: Boolean
     val tempDir: File = File(System.getProperty("java.io.tmpdir", "tmpDir"), "undertow").absoluteFile
@@ -359,15 +361,17 @@ class VaadinApplication : ExceptionHandler {
         // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
         // NOTE: this will load the stats.json file!
 
+        val debug = vaadinConfig.debug
+
         // for our classloader, we have to make sure that we are BY DIRECTORY, not by file, for the resource array!
         val toTypedArray = jarLocations.map { it.resourceDir }.toSet().toTypedArray()
-        this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, vaadinConfig.debug)
+        this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, debug)
 
         // we want to start ALL aspects of the application using our NEW classloader (instead of the "current" classloader)
         Thread.currentThread().contextClassLoader = this.trieClassLoader
 
-        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, vaadinConfig.debug)
-        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, vaadinConfig.debug)
+        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, debug)
+        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, debug)
 
 //        val jarResources = ArrayList<JarResourceManager>()
 //        jarLocations.forEach { (requestPath, resourcePath, relativeResourcePath) ->
@@ -744,8 +748,23 @@ class VaadinApplication : ExceptionHandler {
             return undertowServer?.listenerInfo ?: throw UndertowMessages.MESSAGES.serverNotStarted()
         }
 
+    @Throws(IOException::class)
     fun start() {
+        // make sure that the stats.json file is accessible
+        // the request will come in as 'VAADIN/config/stats.json' or '/VAADIN/config/stats.json'
+        //
+        // If stats.json DOES NOT EXIST, there will be infinite recursive lookups for this file.
+        val statsFile = "VAADIN/config/stats.json"
+
+        // our resource manager ONLY manages disk + jars!
+        if (diskTrie[statsFile] == null && jarStringTrie[statsFile] == null) {
+            throw IOException("Unable to startup the VAADIN webserver. The 'stats.json' definition file is not available.  (Usually at '$statsFile'')" )
+        }
+
+        val statsUrl = "$baseUrl/$statsFile"
+        logger.info("Setting up stats file http location as: $statsUrl")
         vaadinConfig.setupStatsJsonUrl(servlet, baseUrl)
+
         undertowServer = serverBuilder.build()
 
         /////////////////////////////////////////////////////////////////
@@ -841,13 +860,16 @@ class VaadinApplication : ExceptionHandler {
     fun handleRequest(exchange: HttpServerExchange) {
         // dev-mode : incoming requests USUALLY start with a '/'
         val path = exchange.relativePath
-        val debug = vaadinConfig.debug
+        val isTraceEnabled = httpLogger.isTraceEnabled
 
-        if (debug) {
-            println("REQUEST undertow: $path")
+        if (isTraceEnabled) {
+            httpLogger.trace("REQUEST undertow: $path")
         }
 
         if (path.length == 1) {
+            if (isTraceEnabled) {
+                httpLogger.trace("REQUEST of length 1: $path")
+            }
             servletHttpHandler.handleRequest(exchange)
             return
         }
@@ -859,23 +881,28 @@ class VaadinApplication : ExceptionHandler {
         // our resource manager ONLY manages disk + jars!
         val diskResourcePath: URL? = diskTrie[path]
         if (diskResourcePath != null) {
-            if (debug) {
-                println("URL TRIE: $diskResourcePath")
+            if (isTraceEnabled) {
+                httpLogger.trace("URL DISK TRIE: $diskResourcePath")
             }
+
             cacheHandler.handleRequest(exchange)
             return
         }
 
         val jarResourcePath: String? = jarStringTrie[path]
         if (jarResourcePath != null) {
-            if (debug) {
-                println("URL TRIE: $jarResourcePath")
+            if (isTraceEnabled) {
+                httpLogger.trace("URL JAR TRIE: $jarResourcePath")
             }
             cacheHandler.handleRequest(exchange)
             return
         }
 
         // this is the default, and will use the servlet to handle the request
+        if (isTraceEnabled) {
+            httpLogger.trace("Forwarding request to servlet")
+        }
+
         servletHttpHandler.handleRequest(exchange)
     }
 
