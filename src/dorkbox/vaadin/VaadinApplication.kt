@@ -750,6 +750,9 @@ class VaadinApplication : ExceptionHandler {
 
     @Throws(IOException::class)
     fun start() {
+        logger.info("Starting version $version")
+        logger.info("Starting Vaadin $vaadinVersion")
+
         // make sure that the stats.json file is accessible
         // the request will come in as 'VAADIN/config/stats.json' or '/VAADIN/config/stats.json'
         //
@@ -860,16 +863,11 @@ class VaadinApplication : ExceptionHandler {
     fun handleRequest(exchange: HttpServerExchange) {
         // dev-mode : incoming requests USUALLY start with a '/'
         val path = exchange.relativePath
-        val isTraceEnabled = httpLogger.isTraceEnabled
 
-        if (isTraceEnabled) {
-            httpLogger.trace("REQUEST undertow: $path")
-        }
+        httpLogger.trace { "REQUEST undertow: $path" }
 
         if (path.length == 1) {
-            if (isTraceEnabled) {
-                httpLogger.trace("REQUEST of length 1: $path")
-            }
+            httpLogger.trace { "REQUEST of length 1: $path" }
             servletHttpHandler.handleRequest(exchange)
             return
         }
@@ -881,9 +879,7 @@ class VaadinApplication : ExceptionHandler {
         // our resource manager ONLY manages disk + jars!
         val diskResourcePath: URL? = diskTrie[path]
         if (diskResourcePath != null) {
-            if (isTraceEnabled) {
-                httpLogger.trace("URL DISK TRIE: $diskResourcePath")
-            }
+            httpLogger.trace { "URL DISK TRIE: $diskResourcePath" }
 
             cacheHandler.handleRequest(exchange)
             return
@@ -891,17 +887,13 @@ class VaadinApplication : ExceptionHandler {
 
         val jarResourcePath: String? = jarStringTrie[path]
         if (jarResourcePath != null) {
-            if (isTraceEnabled) {
-                httpLogger.trace("URL JAR TRIE: $jarResourcePath")
-            }
+            httpLogger.trace { "URL JAR TRIE: $jarResourcePath" }
             cacheHandler.handleRequest(exchange)
             return
         }
 
         // this is the default, and will use the servlet to handle the request
-        if (isTraceEnabled) {
-            httpLogger.trace("Forwarding request to servlet")
-        }
+        httpLogger.trace { "Forwarding request to servlet" }
 
         servletHttpHandler.handleRequest(exchange)
     }
