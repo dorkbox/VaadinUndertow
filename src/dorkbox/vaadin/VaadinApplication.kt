@@ -62,7 +62,7 @@ class VaadinApplication : ExceptionHandler {
         /**
          * Gets the version number.
          */
-        const val version = "14.7"
+        const val version = "14.7.2"
 
         const val vaadinVersion = VaadinConfig.VAADIN_VERSION
 
