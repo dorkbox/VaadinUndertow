@@ -766,7 +766,7 @@ class VaadinApplication : ExceptionHandler {
 
         val statsUrl = "$baseUrl/$statsFile"
         logger.info("Setting up stats file http location as: $statsUrl")
-        vaadinConfig.setupStatsJsonUrl(servlet, baseUrl)
+        vaadinConfig.setupStatsJsonUrl(servlet, statsUrl)
 
         undertowServer = serverBuilder.build()
 
