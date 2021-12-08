@@ -15,6 +15,7 @@
  */
 package dorkbox.vaadin
 
+import com.vaadin.flow.server.VaadinContext
 import com.vaadin.flow.server.frontend.FrontendUtils
 import dorkbox.vaadin.devMode.DevModeInitializer
 import dorkbox.vaadin.undertow.*
@@ -109,6 +110,8 @@ class VaadinApplication : ExceptionHandler {
     /** This url is used to define what the base url is for accessing the Vaadin stats.json file */
     lateinit var baseUrl: String
 
+
+    private val threadGroup = ThreadGroup("Web Server")
 
     @Volatile
     private var undertowServer: Undertow? = null
@@ -373,96 +376,6 @@ class VaadinApplication : ExceptionHandler {
         val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, debug)
         val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, debug)
 
-//        val jarResources = ArrayList<JarResourceManager>()
-//        jarLocations.forEach { (requestPath, resourcePath, relativeResourcePath) ->
-////            val cleanedUrl = java.net.URLDecoder.decode(jarUrl.file, Charsets.UTF_8)
-//            val file = File(resourcePath.file)
-//
-//            if (debugResources) {
-//                println(" JAR: $file")
-//            }
-//
-//            // the location IN THE JAR is actually "META-INF/resources", so we want to make sure of that when
-//            // serving the request, that the correct path is used.
-//            jarResources.add(JarResourceManager(file, metaInfResources))
-//        }
-
-
-        //  collect all the resources available from each location to ALSO be handled by undertow
-//        val diskResources = ArrayList<FileResourceManager>()
-//        val fileResources = ArrayList<FileResourceManager>()
-
-
-
-
-
-//        diskLocations.forEach { (requestPath, resourcePath) ->
-//            val wwwCompatiblePath = java.net.URLDecoder.decode(requestPath, Charsets.UTF_8)
-//            val diskFile = resourcePath.file
-//
-//
-//            // this serves a BASE location!
-//            diskResources.add(FileResourceManager(metaInfResourcesLocation))
-//
-//            // if this location is where our "META-INF/resources" directory exists, ALSO add that location, because the
-//            // vaadin will request resources based on THAT location as well.
-//            val metaInfResourcesLocation = File(file, metaInfResources)
-//
-//            if (metaInfResourcesLocation.isDirectory) {
-//                diskResources.add(FileResourceManager(metaInfResourcesLocation))
-//
-//                // we will also serve content from ALL child directories
-//                metaInfResourcesLocation.listFiles()?.forEach { childFile ->
-//                    val element = "/${childFile.relativeTo(metaInfResourcesLocation)}"
-//                    if (debugResources) {
-//                        println(" DISK: $cleanedUrl")
-//                    }
-//
-//                    when {
-//                        childFile.isDirectory -> prefixResources.add(element)
-//                        else -> exactResources.add(element)
-//                    }
-//                }
-//            }
-//
-//            if (debugResources) {
-//                println(" DISK: $cleanedUrl")
-//            }
-//
-//            diskResources.add(FileResourceManager(file))
-//
-//            // we will also serve content from ALL child directories
-//            //   (except for the META-INF dir, which we are ALREADY serving content)
-//            file.listFiles()?.forEach { childFile ->
-//                val element = "/${childFile.relativeTo(file)}"
-//
-//                if (debugResources) {
-//                    println(" DISK: $element")
-//                }
-//
-//                when {
-//                    childFile.isDirectory -> {
-//                        if (childFile.name != "META-INF") {
-//                            prefixResources.add(element)
-//                        }
-//                    }
-//                    else -> exactResources.add(element)
-//                }
-//            }
-//        }
-//        jarLocations.forEach { jarUrl ->
-//            val cleanedUrl = java.net.URLDecoder.decode(jarUrl.file, Charsets.UTF_8)
-//            val file = File(cleanedUrl)
-//
-//            if (debugResources) {
-//                println(" JAR: $cleanedUrl")
-//            }
-//
-//            // the location IN THE JAR is actually "META-INF/resources", so we want to make sure of that when
-//            // serving the request, that the correct path is used.
-//            jarResources.add(JarResourceManager(file, metaInfResources))
-//        }
-
         // When we are searching for resources, the following search order is optimized for access speed and request hit order
         //   DISK
         //   files
@@ -473,8 +386,6 @@ class VaadinApplication : ExceptionHandler {
         //     then every other jar
         resources.add(strictFileResourceManager)
         resources.add(jarResourceManager)
-//        resources.addAll(diskResources)
-//        resources.addAll(fileResources)
 
 
 //        val client = jarResources.firstOrNull { it.name.contains("flow-client") }
@@ -507,6 +418,7 @@ class VaadinApplication : ExceptionHandler {
     fun initServlet(enableCachedHandlers: Boolean, cacheTimeoutSeconds: Int,
                     servletClass: Class<out Servlet> = com.vaadin.flow.server.VaadinServlet::class.java,
                     servletName: String = "Vaadin",
+                    secureService: Boolean = false,
                     servletConfig: ServletInfo.() -> Unit = {},
                     undertowConfig: UndertowBuilder.() -> Unit) {
 
@@ -575,8 +487,7 @@ class VaadinApplication : ExceptionHandler {
 //        val instance = servletClass.constructors[0].newInstance()
 //        val immediateInstanceFactory = ImmediateInstanceFactory(instance) as ImmediateInstanceFactory<out Servlet>
 
-        val threadGroup = ThreadGroup("Web Server")
-        val executor = Executors.newCachedThreadPool(DaemonThreadFactory("HttpWrapper", threadGroup))
+        val executor = Executors.newCachedThreadPool(DaemonThreadFactory("HttpWrapper", threadGroup, trieClassLoader))
 
 
         servlet = Servlets.servlet(servletName, servletClass)
@@ -632,7 +543,7 @@ class VaadinApplication : ExceptionHandler {
 
         // configure how the servlet behaves
         val servletSessionConfig = ServletSessionConfig()
-//        servletSessionConfig.isSecure = true  // cookies are only possible when via HTTPS
+        servletSessionConfig.isSecure = secureService  // cookies are only possible when via HTTPS
         servletSessionConfig.sessionTrackingModes = setOf(SessionTrackingMode.COOKIE)
         servletSessionConfig.name = sessionCookieName
         servletBuilder.servletSessionConfig = servletSessionConfig
@@ -753,20 +664,36 @@ class VaadinApplication : ExceptionHandler {
         logger.info("Starting version $version")
         logger.info("Starting Vaadin $vaadinVersion")
 
-        // make sure that the stats.json file is accessible
-        // the request will come in as 'VAADIN/config/stats.json' or '/VAADIN/config/stats.json'
-        //
-        // If stats.json DOES NOT EXIST, there will be infinite recursive lookups for this file.
-        val statsFile = "VAADIN/config/stats.json"
+        // if we don't have it defined, then we use the classloader.
+        val statsUrlFromConfig = vaadinConfig.statsUrl
+        if (statsUrlFromConfig.isEmpty()) {
+            val statsFile = "META-INF/resources/VAADIN/config/stats.json"
 
-        // our resource manager ONLY manages disk + jars!
-        if (diskTrie[statsFile] == null && jarStringTrie[statsFile] == null) {
-            throw IOException("Unable to startup the VAADIN webserver. The 'stats.json' definition file is not available.  (Usually at '$statsFile'')" )
+            // in a roundabout way, this is how vaadin actually load the stats.json file.
+            // (it could be different, but this is the generic way vaadin does it)
+            if (VaadinContext::class.java.classLoader.getResource(statsFile) == null) {
+                throw IOException("Unable to startup the VAADIN webserver. The 'stats.json' definition file is not available.  (Usually on the classloader at '$statsFile'')" )
+            }
+
+            logger.info("Loading the stats.json file via the classloader")
+            vaadinConfig.setupStatsJsonClassloader(servlet, statsFile)
+        } else {
+            // make sure that the stats.json file is accessible
+            // the request will come in as 'VAADIN/config/stats.json' or '/VAADIN/config/stats.json'
+            //
+            // If stats.json DOES NOT EXIST, there will be infinite recursive lookups for this file.
+            val statsFile = "VAADIN/config/stats.json"
+
+            // our resource manager ONLY manages disk + jars!
+            if (diskTrie[statsFile] == null && jarStringTrie[statsFile] == null) {
+                throw IOException("Unable to startup the VAADIN webserver. The 'stats.json' definition file is not available.  (Usually at '$statsFile'')" )
+            }
+
+            val statsUrl = "$baseUrl/$statsFile"
+            logger.info("Loading the stats.json file via URL: $statsUrl")
+            vaadinConfig.setupStatsJsonUrl(servlet, statsUrl)
         }
 
-        val statsUrl = "$baseUrl/$statsFile"
-        logger.info("Setting up stats file http location as: $statsUrl")
-        vaadinConfig.setupStatsJsonUrl(servlet, statsUrl)
 
         undertowServer = serverBuilder.build()
 
@@ -776,10 +703,10 @@ class VaadinApplication : ExceptionHandler {
         servletManager = Servlets.defaultContainer().addDeployment(servletBuilder)
         servletManager.deploy()
 
-
         // TODO: adjust the session timeout (default is 30 minutes) from when the LAST heartbeat is detected
         // manager.deployment.sessionManager.setDefaultSessionTimeout(TimeUnit.MINUTES.toSeconds(Args.webserver.sessionTimeout).toInt())
         servletHttpHandler = servletManager.start()
+
 
 
         // NOTE: look into SessionRestoringHandler to keep session state across re-deploys (this is normally not used in production). this might just be tricks with classloaders to keep sessions around
@@ -799,8 +726,6 @@ class VaadinApplication : ExceptionHandler {
          * https://github.com/undertow-io/undertow/blob/master/core/src/main/java/io/undertow/protocols/alpn/OpenSSLAlpnProvider.java
          */
 
-
-        val threadGroup = ThreadGroup("Undertow Web Server")
 
         // NOTE: we start this in a NEW THREAD so we can create and use a thread-group for all of the undertow threads created. This allows
         //  us to keep our main thread group "un-cluttered" when analyzing thread/stack traces.
@@ -840,12 +765,6 @@ class VaadinApplication : ExceptionHandler {
         }
 
         try {
-            // servletBridge.shutdown();
-            // serverChannel.close().awaitUninterruptibly();
-            // bootstrap.releaseExternalResources();
-            //                servletWebapp.destroy()
-            //                allChannels.close().awaitUninterruptibly()
-
             val worker = worker
             if (worker != null) {
                 worker.shutdown()

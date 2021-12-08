@@ -146,13 +146,22 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
             .addInitParam(FrontendUtils.PARAM_TOKEN_FILE, tokenFileName)
     }
 
+    /**
+     * loads the stats file as a URL
+     */
     fun setupStatsJsonUrl(servlet: ServletInfo, url: String) {
-        // load the stats file as a URL, NOT via the classloader!
-        // this is because in java9+, the classpath/module "mess" complicates the accessibility of this file.
-
         // the stats.json http request will be coming from the local box (so everything is local. Only when on a specific IP should that specific IP be used)
         servlet
             .addInitParam(InitParameters.EXTERNAL_STATS_FILE, "true")
             .addInitParam(InitParameters.EXTERNAL_STATS_URL, "$url")
+    }
+
+    /**
+     * loads the stats file via the classloader.
+     */
+    fun setupStatsJsonClassloader(servlet: ServletInfo, statsFile: String) {
+        // the relative path on disk. The default is invalid because we have custom vaadin compile logic,
+        // so the file is located in a different location
+        servlet.addInitParam(InitParameters.SERVLET_PARAMETER_STATISTICS_JSON, statsFile)
     }
 }
