@@ -21,7 +21,9 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * @param threadGroup the thread-group to assign, otherwise null (which will use the current thread's threadGroup)
  */
-class DaemonThreadFactory(private val threadName: String, private val threadGroup: ThreadGroup? = null) : ThreadFactory {
+class DaemonThreadFactory(private val threadName: String,
+                          private val threadGroup: ThreadGroup? = null,
+                          private val classLoader: ClassLoader? = null) : ThreadFactory {
     private val threadCount = AtomicInteger(0)
 
     override fun newThread(r: Runnable): Thread {
@@ -33,6 +35,9 @@ class DaemonThreadFactory(private val threadName: String, private val threadGrou
 
         thread.isDaemon = true
         thread.name = threadName + "-" + threadCount.getAndIncrement()
+        if (classLoader != null) {
+            thread.contextClassLoader = classLoader
+        }
 
         return thread
     }
