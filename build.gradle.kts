@@ -144,7 +144,7 @@ dependencies {
 
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    implementation("io.github.classgraph:classgraph:4.8.116")
+    implementation("io.github.classgraph:classgraph:4.8.137")
 
     implementation("com.dorkbox:Updates:1.1")
 
@@ -153,7 +153,7 @@ dependencies {
     // awesome logging framework for kotlin.
     // https://www.reddit.com/r/Kotlin/comments/8gbiul/slf4j_loggers_in_3_ways/
     // https://github.com/MicroUtils/kotlin-logging
-    implementation("io.github.microutils:kotlin-logging:2.0.11")
+    implementation("io.github.microutils:kotlin-logging:2.1.15")
 
     // 1.8.0-beta4 supports jpms
     implementation("org.slf4j:slf4j-api:1.8.0-beta4")
