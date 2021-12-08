@@ -162,7 +162,7 @@ class UndertowBuilder() {
      * Essentially, the lifecycle of the provided worker must be maintained outside of the [Undertow] instance.
      */
     fun setWorker(worker: XnioWorker?): UndertowBuilder {
-        builder.setWorker<Any>(worker)
+        builder.setWorker(worker)
         return this
     }
 
@@ -172,7 +172,7 @@ class UndertowBuilder() {
     }
 
     fun setByteBufferPool(byteBufferPool: ByteBufferPool): UndertowBuilder {
-        builder.setByteBufferPool<Any>(byteBufferPool)
+        builder.setByteBufferPool(byteBufferPool)
         return this
     }
 }
