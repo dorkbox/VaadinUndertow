@@ -28,9 +28,6 @@ import java.io.File
  */
 class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
     companion object {
-        // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
-        const val VAADIN_VERSION = "14.7.8"
-
         // these are string parameters that are passed in via compile options
         val EXTRACT_JAR = "extract.jar"
         val EXTRACT_JAR_OVERWRITE = "extract.jar.overwrite"
