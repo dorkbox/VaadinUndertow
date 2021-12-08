@@ -31,23 +31,36 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
         const val VAADIN_VERSION = "14.7.8"
 
+        // these are string parameters that are passed in via compile options
         val EXTRACT_JAR = "extract.jar"
         val EXTRACT_JAR_OVERWRITE = "extract.jar.overwrite"
         val DEBUG = "debug"
+        val STATS_URL = "stats_url"
     }
 
     val tokenFileName: String
     val devMode: Boolean
     val pNpmEnabled: Boolean
 
-    // option to extract files or to load from jar only. This is a performance option.
+    /**
+     * option to extract files or to load from jar only. This is a performance option.
+     */
     val extractFromJar: Boolean
 
-    // option to force files to be overwritten when `extractFromJar` is true
+    /**
+     * option to force files to be overwritten when `extractFromJar` is true
+     */
     val forceExtractOverwrite: Boolean
 
-    // option to permit us to fully debug the vaadin application. This must be set during the token compile phase
+    /**
+     * option to permit us to fully debug the vaadin application. This must be set during the token compile phase
+     */
     val debug: Boolean
+
+    /**
+     * This option allows us to customize how, and where the stats.json file is loaded - specifically via HTTP/s requests from a different (or the same) server. For example: "VAADIN/config/stats.json"
+     */
+    var statsUrl: String = ""
 
     init {
         // find the config/stats.json to see what mode (PRODUCTION or DEV) we should run in.
@@ -91,11 +104,16 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
                     "You must FIRST compile the vaadin resources for DEV or PRODUCTION mode!")
         }
 
+
         devMode = !tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)
         pNpmEnabled = tokenJson.getBoolean(InitParameters.SERVLET_PARAMETER_ENABLE_PNPM)
+
         extractFromJar = getBoolean(tokenJson, EXTRACT_JAR)
         forceExtractOverwrite = getBoolean(tokenJson, EXTRACT_JAR_OVERWRITE, false)
-        debug = getBoolean(tokenJson, EXTRACT_JAR_OVERWRITE, false)
+        debug = getBoolean(tokenJson, DEBUG, false)
+        statsUrl = getString(tokenJson, STATS_URL, "")
+
+
 
         if (devMode && runningAsJar) {
             throw RuntimeException("Invalid run configuration. It is not possible to run DEV MODE from a deployed jar.\n" +
@@ -114,6 +132,10 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
 
     fun getBoolean(tokenJson: JsonObject, tokenName: String, defaultValue: Boolean = true): Boolean {
         return if (tokenJson.hasKey(tokenName)) tokenJson.getBoolean(tokenName) else defaultValue
+    }
+
+    fun getString(tokenJson: JsonObject, tokenName: String, defaultValue: String = ""): String {
+        return if (tokenJson.hasKey(tokenName)) tokenJson.getString(tokenName) else defaultValue
     }
 
     fun addServletInitParameters(servlet: ServletInfo) {
