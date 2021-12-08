@@ -540,6 +540,15 @@ class VaadinApplication : ExceptionHandler {
 //        // destroy the actors on session invalidation
 //        servletBuilder.addSessionListener(ActorSessionCleanup(coroutineHttpWrapper.actorsPerSession))
 
+        // NOTE: To use a DIFFERENT lock strategy (ie: one compatible with coroutines), start here
+        // flow-server/src/main/java/com/vaadin/flow/server/VaadinService.java
+        //  protected Lock lockSession(WrappedSession wrappedSession
+        //  protected void unlockSession(WrappedSession wrappedSession, Lock lock) {
+        // and
+        //   for custom lock storage
+        //     * strategy override {@link #getSessionLock(WrappedSession)} and
+        //     * {@link #setSessionLock(WrappedSession,Lock)} instead.
+
 
 
         // configure how the servlet behaves
