@@ -77,6 +77,7 @@ class VaadinApplication : ExceptionHandler {
     private val httpLogger = KotlinLogging.logger(logger.name + ".http")
 
     val runningAsJar: Boolean
+    var enableCachedHandlers = false
     val tempDir: File = File(System.getProperty("java.io.tmpdir", "tmpDir"), "undertow").absoluteFile
 
     private val onStopList = mutableListOf<Runnable>()
@@ -422,7 +423,7 @@ class VaadinApplication : ExceptionHandler {
                     servletConfig: ServletInfo.() -> Unit = {},
                     undertowConfig: UndertowBuilder.() -> Unit) {
 
-
+        this.enableCachedHandlers = enableCachedHandlers
         resourceCollectionManager = ResourceCollectionManager(resources)
 
         val conditionalResourceManager =
@@ -661,9 +662,6 @@ class VaadinApplication : ExceptionHandler {
 
     @Throws(IOException::class)
     fun start() {
-        logger.info("Starting version $version")
-        logger.info("Starting Vaadin $vaadinVersion")
-
         // if we don't have it defined, then we use the classloader.
         val statsUrlFromConfig = vaadinConfig.statsUrl
         if (statsUrlFromConfig.isEmpty()) {
@@ -815,6 +813,21 @@ class VaadinApplication : ExceptionHandler {
         httpLogger.trace { "Forwarding request to servlet" }
 
         servletHttpHandler.handleRequest(exchange)
+    }
+
+    fun logStartupInfo() {
+        logger.info { "Temp dir: $tempDir" }
+        logger.info { "Launched from jar: $runningAsJar" }
+        logger.info { "Cached HTTP handlers: $enableCachedHandlers" }
+
+        if (vaadinConfig.devMode) {
+            logger.info { "Vaadin running in DEVELOPMENT mode" }
+        } else {
+            logger.info { "Vaadin running in PRODUCTION mode" }
+        }
+
+        logger.info { "Loader version: $version" }
+        logger.info { "Vaadin version: $vaadinVersion" }
     }
 
     /**
