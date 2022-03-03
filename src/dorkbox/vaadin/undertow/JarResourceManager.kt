@@ -21,6 +21,7 @@ import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.server.handlers.resource.URLResource
+import mu.KLogger
 import java.io.IOException
 import java.net.URL
 
@@ -31,19 +32,14 @@ import java.net.URL
  * @author Andy Wilkinson
  * @author Dorkbox LLC
  */
-internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val debug: Boolean) : ResourceManager {
+internal class JarResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val logger: KLogger) : ResourceManager {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
-        if (debug) {
-            println("REQUEST jar: $path")
-        }
+        logger.trace { "REQUEST jar: $path" }
 
         val url = trie[path] ?: return null
-
-        if (debug) {
-            println("TRIE: $url")
-        }
+        logger.trace { "TRIE: $url" }
 
         val resource = URLResource(url, path)
         if (path.isNotBlank() && path != "/" && resource.contentLength < 0) {

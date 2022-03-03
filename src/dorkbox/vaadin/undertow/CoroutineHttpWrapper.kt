@@ -67,7 +67,7 @@ class CoroutineHttpWrapper(private val sessionCookieName: String, private val ca
             Connectors.executeRootHandler(handler, msg)
         }
 
-        println("stopping actor $this")
+        logger.info("stopping actor $this")
     }
 
 

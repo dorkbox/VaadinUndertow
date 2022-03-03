@@ -21,6 +21,7 @@ import io.undertow.server.handlers.resource.FileResource
 import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
+import mu.KLogger
 import java.io.File
 import java.io.IOException
 import java.net.URL
@@ -30,19 +31,15 @@ import java.net.URL
  *
  * @author Dorkbox LLC
  */
-internal class StrictFileResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val debug: Boolean) : io.undertow.server.handlers.resource.FileResourceManager(File(".")) {
+internal class StrictFileResourceManager(val name: String, val trie: DoubleArrayTrie<URL>, val logger: KLogger) : io.undertow.server.handlers.resource.FileResourceManager(File(".")) {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
-        if (debug) {
-            println("REQUEST static: $path")
-        }
+        logger.trace { "REQUEST static: $path" }
 
         val url = trie[path] ?: return null
 
-        if (debug) {
-            println("TRIE: $url")
-        }
+        logger.trace { "TRIE: $url" }
 
         val resource = FileResource(File(url.file), this, path)
         if (path.isNotBlank() && path != "/" && resource.contentLength < 0) {

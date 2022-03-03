@@ -63,7 +63,7 @@ class VaadinApplication : ExceptionHandler {
         /**
          * Gets the version number.
          */
-        const val version = "14.7.3"
+        const val version = "14.7.4"
 
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
         const val vaadinVersion = "14.7.8"
@@ -371,13 +371,13 @@ class VaadinApplication : ExceptionHandler {
 
         // for our classloader, we have to make sure that we are BY DIRECTORY, not by file, for the resource array!
         val toTypedArray = jarLocations.map { it.resourceDir }.toSet().toTypedArray()
-        this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, debug)
+        this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, logger)
 
         // we want to start ALL aspects of the application using our NEW classloader (instead of the "current" classloader)
         Thread.currentThread().contextClassLoader = this.trieClassLoader
 
-        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, debug)
-        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, debug)
+        val strictFileResourceManager = StrictFileResourceManager("Static Files", diskTrie, httpLogger)
+        val jarResourceManager = JarResourceManager("Jar Files", jarUrlTrie, httpLogger)
 
         // When we are searching for resources, the following search order is optimized for access speed and request hit order
         //   DISK
