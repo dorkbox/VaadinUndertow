@@ -161,7 +161,7 @@ class VaadinApplication : ExceptionHandler {
                 // must ALSO use forward slash (unix)!!
                 val relativePath = resourcePath.path.substring(rootFileSize)
 
-                logger.error {
+                logger.trace {
                     "Disk resource: $relativePath"
                 }
 
