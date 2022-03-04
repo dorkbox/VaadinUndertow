@@ -27,7 +27,9 @@ import io.undertow.util.AttachmentKey
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.channels.sendBlocking
+import kotlinx.coroutines.channels.trySendBlocking
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -93,7 +95,9 @@ class CoroutineHttpWrapper(private val sessionCookieName: String, private val ca
                 // suppressed because we DO NOT use threading, we use coroutines, which are semantically different
                 @Suppress("DEPRECATION")
                 exchange.dispatch() // this marks the exchange as having been DISPATCHED
-                actor.sendBlocking(exchange)
+                actor.trySendBlocking(exchange)
+                     .onFailure { t: Throwable? -> logger.error("Error sending data.", t) }
+
             }
             else {
                 // if we are not in the IO thread, just process as normal
