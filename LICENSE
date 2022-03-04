@@ -1,7 +1,7 @@
  - VaadinUndertow - Vaadin support for the Undertow web server
    [The Apache Software License, Version 2.0]
    https://git.dorkbox.com/dorkbox/VaadinUndertow
-   Copyright 2021
+   Copyright 2022
      Dorkbox LLC
 
    Extra license information
@@ -27,18 +27,6 @@
        Copyright 2017
          Pronghorn Technology LLC
 
-     - Vaadin - An open platform for building modern web apps for Java back ends
-       [The Apache Software License, Version 2.0]
-       https://github.com/vaadin/
-       Copyright 2021
-         Vaadin Ltd.
-
-     - Logback - Logback is a logging framework for Java applications
-       [The Apache Software License, Version 2.0]
-       http://logback.qos.ch
-       Copyright 2021
-         QOS.ch
-
      - Kotlin - 
        [The Apache Software License, Version 2.0]
        https://github.com/JetBrains/kotlin
@@ -47,16 +35,28 @@
        Kotlin Compiler, Test Data+Libraries, and Tools repository contain third-party code, to which different licenses may apply
        See: https://github.com/JetBrains/kotlin/blob/master/license/README.md
 
+     - Vaadin - An open platform for building modern web apps for Java back ends
+       [The Apache Software License, Version 2.0]
+       https://github.com/vaadin/
+       Copyright 2022
+         Vaadin Ltd.
+
+     - Logback - Logback is a logging framework for Java applications
+       [The Apache Software License, Version 2.0]
+       http://logback.qos.ch
+       Copyright 2022
+         QOS.ch
+
      - kotlinx.coroutines - Library support for Kotlin coroutines with multiplatform support
        [The Apache Software License, Version 2.0]
        https://github.com/Kotlin/kotlinx.coroutines
-       Copyright 2021
+       Copyright 2022
          JetBrains s.r.o.
 
      - Undertow - High performance non-blocking webserver
        [The Apache Software License, Version 2.0]
        https://github.com/undertow-io/undertow
-       Copyright 2021
+       Copyright 2022
          JBoss
          Red Hat, Inc.
          Individual contributors as listed in files
@@ -64,25 +64,25 @@
      - ClassGraph - An uber-fast parallelized Java classpath scanner and module scanner
        [The Apache Software License, Version 2.0]
        https://github.com/classgraph/classgraph
-       Copyright 2021
+       Copyright 2022
          Luke Hutchison
 
      - kotlin-logging - Lightweight logging framework for Kotlin
        [The Apache Software License, Version 2.0]
        https://github.com/MicroUtils/kotlin-logging
-       Copyright 2021
+       Copyright 2022
          Ohad Shai
 
      - SLF4J - Simple facade or abstraction for various logging frameworks
        [MIT License]
        http://www.slf4j.org
-       Copyright 2021
+       Copyright 2022
          QOS.ch
 
      - JUL to SLF4J - Java Util Logging implemented over SLF4J
        [MIT License]
        http://www.slf4j.org
-       Copyright 2021
+       Copyright 2022
          QOS.ch
 
      - Updates - Software Update Management

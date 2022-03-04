@@ -26,12 +26,12 @@ import java.time.Instant
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "2.14"
-    id("com.dorkbox.Licensing") version "2.10"
+    id("com.dorkbox.GradleUtils") version "2.16"
+    id("com.dorkbox.Licensing") version "2.12"
     id("com.dorkbox.VersionUpdate") version "2.4"
-    id("com.dorkbox.GradlePublish") version "1.11"
+    id("com.dorkbox.GradlePublish") version "1.12"
 
-    kotlin("jvm") version "1.5.21"
+    kotlin("jvm") version "1.6.10"
 }
 
 object Extras {
@@ -39,7 +39,7 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "14.7.3"
+    const val version = "14.7.4"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -47,11 +47,11 @@ object Extras {
 
     val buildDate = Instant.now().toString()
 
-    const val coroutineVer = "1.4.3"
+    const val coroutineVer = "1.6.0"
 
     // these BOTH must match the version information in the VaadinApplication.kt file (this is automatically passed into the plugin)
     const val vaadinVer = "14.7.8"
-    const val undertowVer = "2.2.14.Final"
+    const val undertowVer = "2.2.16.Final"
 }
 
 ///////////////////////////////
@@ -60,7 +60,7 @@ object Extras {
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 GradleUtils.defaults()
 GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
-//GradleUtils.jpms(JavaVersion.VERSION_1_9)
+GradleUtils.jpms(JavaVersion.VERSION_1_9)
 
 
 licensing {
@@ -97,70 +97,36 @@ licensing {
     }
 }
 
-
-sourceSets {
-    main {
-        java {
-            setSrcDirs(listOf("src"))
-
-            // want to include java+kotlin files for the source. 'setSrcDirs' resets includes...
-            include("**/*.java", "**/*.kt")
-        }
-    }
-}
-
-kotlin {
-    sourceSets {
-        main {
-            kotlin {
-                setSrcDirs(listOf("src"))
-
-                // want to include kotlin files for the source. 'setSrcDirs' resets includes...
-                include("**/*.java", "**/*.kt")
-            }
-        }
-
-        test {
-            kotlin {
-                setSrcDirs(listOf("test"))
-
-                // want to include kotlin files for the source. 'setSrcDirs' resets includes...
-                include("**/*.java", "**/*.kt")
-            }
-        }
-    }
-}
-
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Extras.coroutineVer}")
+    api("org.jetbrains.kotlin:kotlin-reflect")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Extras.coroutineVer}")
 
     compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
     // we use undertow 2, with kotlin coroutines on top (with 1 actor per session)
-    implementation("io.undertow:undertow-core:${Extras.undertowVer}")
-    implementation("io.undertow:undertow-servlet:${Extras.undertowVer}")
-    implementation("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
+    api("io.undertow:undertow-core:${Extras.undertowVer}")
+    api("io.undertow:undertow-servlet:${Extras.undertowVer}")
+    api("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
 
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    implementation("io.github.classgraph:classgraph:4.8.137")
+    api("io.github.classgraph:classgraph:4.8.141")
 
-    implementation("com.dorkbox:Updates:1.1")
+    api("com.dorkbox:Updates:1.1")
 
 //    implementation("com.conversantmedia:disruptor:1.2.19")
 
     // awesome logging framework for kotlin.
     // https://www.reddit.com/r/Kotlin/comments/8gbiul/slf4j_loggers_in_3_ways/
     // https://github.com/MicroUtils/kotlin-logging
-    implementation("io.github.microutils:kotlin-logging:2.1.15")
+    api("io.github.microutils:kotlin-logging:2.1.21")
 
     // 1.8.0-beta4 supports jpms
-    implementation("org.slf4j:slf4j-api:1.8.0-beta4")
-    implementation("org.slf4j:jul-to-slf4j:1.8.0-beta4")
+    api("org.slf4j:slf4j-api:1.8.0-beta4")
+    api("org.slf4j:jul-to-slf4j:1.8.0-beta4")
 
 
-    implementation("ch.qos.logback:logback-core:1.3.0-alpha4")
+    api("ch.qos.logback:logback-core:1.3.0-alpha4")
     compileOnly("ch.qos.logback:logback-classic:1.3.0-alpha4")
 
 
