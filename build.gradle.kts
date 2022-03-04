@@ -60,7 +60,7 @@ object Extras {
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 GradleUtils.defaults()
 GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
-GradleUtils.jpms(JavaVersion.VERSION_1_9)
+//GradleUtils.jpms(JavaVersion.VERSION_1_9)
 
 
 licensing {
