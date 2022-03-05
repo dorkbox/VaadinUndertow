@@ -39,7 +39,7 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "14.7.4"
+    const val version = "14.7.5"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -51,6 +51,8 @@ object Extras {
 
     // these BOTH must match the version information in the VaadinApplication.kt file (this is automatically passed into the plugin)
     const val vaadinVer = "14.7.8"
+
+    // These MUST be in lock-step with what the GradleVaadin launcher defines, otherwise horrific errors can occur.
     const val undertowVer = "2.2.16.Final"
 }
 
