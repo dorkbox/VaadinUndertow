@@ -39,15 +39,13 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "14.7.5"
+    const val version = "14.7.6"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
     const val url = "https://git.dorkbox.com/dorkbox/VaadinUndertow"
 
     val buildDate = Instant.now().toString()
-
-    const val coroutineVer = "1.6.0"
 
     // these BOTH must match the version information in the VaadinApplication.kt file (this is automatically passed into the plugin)
     const val vaadinVer = "14.7.8"
@@ -101,7 +99,7 @@ licensing {
 
 dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Extras.coroutineVer}")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
 
     compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
