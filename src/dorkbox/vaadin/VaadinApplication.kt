@@ -17,7 +17,7 @@ package dorkbox.vaadin
 
 import com.vaadin.flow.server.VaadinContext
 import com.vaadin.flow.server.frontend.FrontendUtils
-import dorkbox.vaadin.devMode.DevModeInitializer
+import com.vaadin.flow.server.startup.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.TrieClassLoader
@@ -48,8 +48,12 @@ import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
-import javax.servlet.*
+import java.util.concurrent.atomic.*
+import javax.servlet.Servlet
+import javax.servlet.ServletContainerInitializer
+import javax.servlet.ServletRequest
+import javax.servlet.ServletResponse
+import javax.servlet.SessionTrackingMode
 import javax.servlet.annotation.HandlesTypes
 import kotlin.reflect.KClass
 
@@ -63,11 +67,11 @@ class VaadinApplication : ExceptionHandler {
         /**
          * Gets the version number.
          */
-        const val version = "14.7.6"
+        const val version = "14.8"
 
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
-        const val vaadinVersion = "14.7.8"
-        const val undertowVersion = "2.2.14.Final"
+        const val vaadinVersion = "14.8.20"
+        const val undertowVersion = "2.2.21.Final"
 
         init {
             // Add this project to the updates system, which verifies this class + UUID + version information
@@ -584,7 +588,7 @@ class VaadinApplication : ExceptionHandler {
                             // instead of the default, we load **OUR** dev-mode initializer.
                             // The vaadin one is super buggy for custom environments
                             servletBuilder.addServletContainerInitializer(
-                                ServletContainerInitializerInfo(DevModeInitializer::class.java, classSet))
+                                ServletContainerInitializerInfo(com.vaadin.flow.server.startup.DevModeInitializer::class.java, classSet))
                         }
                     } else {
                         // do not load the dev-mode initializer for production mode

@@ -23,7 +23,7 @@ Maven Info
     <dependency>
       <groupId>com.dorkbox</groupId>
       <artifactId>VaadinUndertow</artifactId>
-      <version>14.7.6</version>
+      <version>14.8</version>
     </dependency>
 </dependencies>
 ```
@@ -33,7 +33,7 @@ Gradle Info
 ```
 dependencies {
     ...
-    implementation "com.dorkbox:VaadinUndertow:14.7.6"
+    implementation "com.dorkbox:VaadinUndertow:14.8"
 }
 ````
 
@@ -41,4 +41,3 @@ License
 ---------
 This project is © 2020 dorkbox llc, and is distributed under the terms of the Apache v2.0 License. See file "LICENSE" for further
  references.
-

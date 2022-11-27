@@ -20,18 +20,20 @@
 ////// RELEASE : (to sonatype/maven central), <'publish and release' - 'publishToSonatypeAndRelease'>
 ///////////////////////////////
 
-import dorkbox.gradle.kotlin
 import java.time.Instant
 
+repositories {
+    mavenCentral()
+}
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "2.16"
-    id("com.dorkbox.Licensing") version "2.12"
-    id("com.dorkbox.VersionUpdate") version "2.4"
-    id("com.dorkbox.GradlePublish") version "1.12"
+    id("com.dorkbox.GradleUtils") version "3.3"
+    id("com.dorkbox.Licensing") version "2.17"
+    id("com.dorkbox.VersionUpdate") version "2.5"
+    id("com.dorkbox.GradlePublish") version "1.13"
 
-    kotlin("jvm") version "1.6.10"
+    kotlin("jvm") version "1.7.20"
 }
 
 object Extras {
@@ -39,7 +41,8 @@ object Extras {
     const val group = "com.dorkbox"
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
-    const val version = "14.7.6"
+
+    const val version = "14.8"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -47,11 +50,9 @@ object Extras {
 
     val buildDate = Instant.now().toString()
 
-    // these BOTH must match the version information in the VaadinApplication.kt file (this is automatically passed into the plugin)
-    const val vaadinVer = "14.7.8"
-
-    // These MUST be in lock-step with what the GradleVaadin launcher defines, otherwise horrific errors can occur.
-    const val undertowVer = "2.2.16.Final"
+    // These MUST be in lock-step with what the GradleVaadin (other project) + gradle.build.kts + VaadinApplication.kt define, otherwise horrific errors can occur.
+    const val vaadinVer = "14.8.20"
+    const val undertowVer = "2.2.21.Final"
 }
 
 ///////////////////////////////
@@ -59,7 +60,7 @@ object Extras {
 ///////////////////////////////
 GradleUtils.load("$projectDir/../../gradle.properties", Extras)
 GradleUtils.defaults()
-GradleUtils.compileConfiguration(JavaVersion.VERSION_1_8)
+GradleUtils.compileConfiguration(JavaVersion.VERSION_11)
 //GradleUtils.jpms(JavaVersion.VERSION_1_9)  vaadin doesn't support jpms yet
 
 
@@ -99,18 +100,17 @@ licensing {
 
 dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
     compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
     // we use undertow 2, with kotlin coroutines on top (with 1 actor per session)
-    api("io.undertow:undertow-core:${Extras.undertowVer}")
-    api("io.undertow:undertow-servlet:${Extras.undertowVer}")
-    api("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
-
+    implementation("io.undertow:undertow-core:${Extras.undertowVer}")
+    implementation("io.undertow:undertow-servlet:${Extras.undertowVer}")
+    implementation("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    api("io.github.classgraph:classgraph:4.8.141")
+    api("io.github.classgraph:classgraph:4.8.151")
 
     api("com.dorkbox:Updates:1.1")
 
@@ -119,15 +119,15 @@ dependencies {
     // awesome logging framework for kotlin.
     // https://www.reddit.com/r/Kotlin/comments/8gbiul/slf4j_loggers_in_3_ways/
     // https://github.com/MicroUtils/kotlin-logging
-    api("io.github.microutils:kotlin-logging:2.1.21")
+    api("io.github.microutils:kotlin-logging:3.0.4")
 
     // 1.8.0-beta4 supports jpms
-    api("org.slf4j:slf4j-api:1.8.0-beta4")
-    api("org.slf4j:jul-to-slf4j:1.8.0-beta4")
+    api("org.slf4j:slf4j-api:2.0.5")
+    api("org.slf4j:jul-to-slf4j:2.0.5")
 
 
-    api("ch.qos.logback:logback-core:1.3.0-alpha4")
-    compileOnly("ch.qos.logback:logback-classic:1.3.0-alpha4")
+    api("ch.qos.logback:logback-core:1.4.5")
+    compileOnly("ch.qos.logback:logback-classic:1.4.5")
 
 
     testImplementation("junit:junit:4.13.2")
