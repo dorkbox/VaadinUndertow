@@ -17,7 +17,6 @@ package dorkbox.vaadin
 
 import com.vaadin.flow.server.VaadinContext
 import com.vaadin.flow.server.frontend.FrontendUtils
-import com.vaadin.flow.server.startup.DevModeInitializer
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.TrieClassLoader
@@ -45,9 +44,7 @@ import java.io.File
 import java.io.IOException
 import java.net.URL
 import java.util.*
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 import javax.servlet.Servlet
 import javax.servlet.ServletContainerInitializer
@@ -67,10 +64,10 @@ class VaadinApplication : ExceptionHandler {
         /**
          * Gets the version number.
          */
-        const val version = "14.8"
+        const val version = "14.9"
 
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
-        const val vaadinVersion = "14.8.20"
+        const val vaadinVersion = "14.9.4"
         const val undertowVersion = "2.2.21.Final"
 
         init {

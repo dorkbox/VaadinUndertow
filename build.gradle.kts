@@ -28,12 +28,12 @@ repositories {
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
 
 plugins {
-    id("com.dorkbox.GradleUtils") version "3.3"
-    id("com.dorkbox.Licensing") version "2.17"
+    id("com.dorkbox.GradleUtils") version "3.8"
+    id("com.dorkbox.Licensing") version "2.19"
     id("com.dorkbox.VersionUpdate") version "2.5"
-    id("com.dorkbox.GradlePublish") version "1.13"
+    id("com.dorkbox.GradlePublish") version "1.17"
 
-    kotlin("jvm") version "1.7.20"
+    kotlin("jvm") version "1.7.22"
 }
 
 object Extras {
@@ -42,7 +42,7 @@ object Extras {
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
 
-    const val version = "14.8"
+    const val version = "14.9"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
@@ -51,8 +51,8 @@ object Extras {
     val buildDate = Instant.now().toString()
 
     // These MUST be in lock-step with what the GradleVaadin (other project) + gradle.build.kts + VaadinApplication.kt define, otherwise horrific errors can occur.
-    const val vaadinVer = "14.8.20"
-    const val undertowVer = "2.2.21.Final"
+    const val vaadinVer = "14.9.4"
+    const val undertowVer = "2.2.22.Final"
 }
 
 ///////////////////////////////
@@ -105,12 +105,12 @@ dependencies {
     compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
     // we use undertow 2, with kotlin coroutines on top (with 1 actor per session)
-    implementation("io.undertow:undertow-core:${Extras.undertowVer}")
-    implementation("io.undertow:undertow-servlet:${Extras.undertowVer}")
-    implementation("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
+    api("io.undertow:undertow-core:${Extras.undertowVer}")
+    api("io.undertow:undertow-servlet:${Extras.undertowVer}")
+    api("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    api("io.github.classgraph:classgraph:4.8.151")
+    api("io.github.classgraph:classgraph:4.8.154")
 
     api("com.dorkbox:Updates:1.1")
 
@@ -126,11 +126,12 @@ dependencies {
     api("org.slf4j:jul-to-slf4j:2.0.5")
 
 
-    api("ch.qos.logback:logback-core:1.4.5")
-    compileOnly("ch.qos.logback:logback-classic:1.4.5")
-
-
-    testImplementation("junit:junit:4.13.2")
+//    api("ch.qos.logback:logback-core:1.4.5")
+//    compileOnly("ch.qos.logback:logback-classic:1.4.5")
+//
+//
+//    testImplementation("com.vaadin:vaadin:${Extras.vaadinVer}")
+//    testImplementation("ch.qos.logback:logback-classic:1.4.5")
 }
 
 tasks.jar.get().apply {

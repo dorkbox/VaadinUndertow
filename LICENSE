@@ -1,7 +1,7 @@
  - VaadinUndertow - Vaadin support for the Undertow web server
    [The Apache Software License, Version 2.0]
    https://git.dorkbox.com/dorkbox/VaadinUndertow
-   Copyright 2022
+   Copyright 2023
      Dorkbox LLC
 
    Extra license information
@@ -38,52 +38,46 @@
      - kotlinx.coroutines - Library support for Kotlin coroutines with multiplatform support
        [The Apache Software License, Version 2.0]
        https://github.com/Kotlin/kotlinx.coroutines
-       Copyright 2022
+       Copyright 2023
          JetBrains s.r.o.
+
+     - Undertow - High performance non-blocking webserver
+       [The Apache Software License, Version 2.0]
+       https://github.com/undertow-io/undertow
+       Copyright 2023
+         JBoss
+         Red Hat, Inc.
+         Individual contributors as listed in files
 
      - ClassGraph - An uber-fast parallelized Java classpath scanner and module scanner
        [The Apache Software License, Version 2.0]
        https://github.com/classgraph/classgraph
-       Copyright 2022
+       Copyright 2023
          Luke Hutchison
 
      - kotlin-logging - Lightweight logging framework for Kotlin
        [The Apache Software License, Version 2.0]
        https://github.com/MicroUtils/kotlin-logging
-       Copyright 2022
+       Copyright 2023
          Ohad Shai
 
      - SLF4J - Simple facade or abstraction for various logging frameworks
        [MIT License]
        http://www.slf4j.org
-       Copyright 2022
+       Copyright 2023
          QOS.ch
 
      - JUL to SLF4J - Java Util Logging implemented over SLF4J
        [MIT License]
        http://www.slf4j.org
-       Copyright 2022
-         QOS.ch
-
-     - Logback - Logback is a logging framework for Java applications
-       [The Apache Software License, Version 2.0]
-       http://logback.qos.ch
-       Copyright 2022
+       Copyright 2023
          QOS.ch
 
      - Vaadin - An open platform for building modern web apps for Java back ends
        [The Apache Software License, Version 2.0]
        https://github.com/vaadin/
-       Copyright 2022
+       Copyright 2023
          Vaadin Ltd.
-
-     - Undertow - High performance non-blocking webserver
-       [The Apache Software License, Version 2.0]
-       https://github.com/undertow-io/undertow
-       Copyright 2022
-         JBoss
-         Red Hat, Inc.
-         Individual contributors as listed in files
 
      - Updates - Software Update Management
        [The Apache Software License, Version 2.0]
