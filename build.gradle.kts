@@ -42,7 +42,7 @@ object Extras {
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
 
-    const val version = "14.9"
+    const val version = "14.9.1"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
