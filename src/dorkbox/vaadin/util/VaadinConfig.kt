@@ -74,11 +74,8 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
                 // this file from the jar to the temp location.
                 File(tempDir, defaultTokenFile).absolutePath
             } else {
-                if (tokenInJar.path.startsWith("/")) {
-                    tokenInJar.path.substring(1)
-                } else {
-                    tokenInJar.path
-                }
+                // loading as a FILE, so we must make sure
+                tokenInJar.path
             }
 
             tokenJson = JsonUtil.parse(tokenInJar.readText(Charsets.UTF_8)) as JsonObject?
@@ -97,8 +94,8 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
 
         if (tokenFileName.isEmpty() || tokenJson == null || !tokenJson.hasKey(InitParameters.SERVLET_PARAMETER_PRODUCTION_MODE)) {
             // this is a problem! we must configure the system first via gradle!
-            throw java.lang.RuntimeException("Unable to continue! Error reading token!" +
-                    "You must FIRST compile the vaadin resources for DEV or PRODUCTION mode!")
+            throw java.lang.RuntimeException("Unable to continue! Error reading token! " +
+                    "You must FIRST compile the vaadin resources for Development or Production mode!")
         }
 
 
