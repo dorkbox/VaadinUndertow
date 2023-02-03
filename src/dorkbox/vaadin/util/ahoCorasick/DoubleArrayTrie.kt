@@ -310,7 +310,7 @@ class DoubleArrayTrie<V>(map: Map<String, V>? = null,
     }
 
     /**
-     * Pick the value by index in value array <br></br>
+     * Pick the value by index in value array
      * Notice that to be more efficiently, this method DOES NOT check the parameter
      *
      * @param index The index

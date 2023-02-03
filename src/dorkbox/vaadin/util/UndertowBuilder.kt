@@ -21,7 +21,7 @@ import io.undertow.connector.ByteBufferPool
 import io.undertow.server.HttpHandler
 import org.xnio.Option
 import org.xnio.XnioWorker
-import java.util.concurrent.Executor
+import java.util.concurrent.*
 import javax.net.ssl.KeyManager
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -153,7 +153,6 @@ class UndertowBuilder() {
      * to the various worker-related configuration (ioThreads, workerThreads, workerOptions)
      * when [Undertow.start] is called.
      * Additionally, this newly created worker will be shutdown when [Undertow.stop] is called.
-     * <br></br>
      *
      *
      * When non-null, the provided [XnioWorker] will be reused instead of creating a new [XnioWorker]
