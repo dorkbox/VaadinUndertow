@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,8 +67,14 @@ class VaadinApplication : ExceptionHandler {
         const val version = "14.9.1"
 
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
-        const val vaadinVersion = "14.9.4"
+        const val vaadinVersion = "14.10.1"
         const val undertowVersion = "2.2.21.Final"
+
+        // Vaadin 14.9 changed how license checking works, and doesn't include this.
+        const val oshiVersion = "6.4.0"
+
+        // license checker requires JNA
+        const val jnaVersion = "5.12.1"  //5.13 isn't properly published? It cannot be found.
 
         init {
             // Add this project to the updates system, which verifies this class + UUID + version information
