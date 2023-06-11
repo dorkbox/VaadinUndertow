@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,7 +147,7 @@ class VaadinConfig(runningAsJar: Boolean, tempDir: File) {
         // the stats.json http request will be coming from the local box (so everything is local. Only when on a specific IP should that specific IP be used)
         servlet
             .addInitParam(InitParameters.EXTERNAL_STATS_FILE, "true")
-            .addInitParam(InitParameters.EXTERNAL_STATS_URL, "$url")
+            .addInitParam(InitParameters.EXTERNAL_STATS_URL, url)
     }
 
     /**
