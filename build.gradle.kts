@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,20 +20,13 @@
 ////// RELEASE : (to sonatype/maven central), <'publish and release' - 'publishToSonatypeAndRelease'>
 ///////////////////////////////
 
-import java.time.Instant
-
-repositories {
-    mavenCentral()
-}
-gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS   // always show the stacktrace!
-
 plugins {
-    id("com.dorkbox.GradleUtils") version "3.8"
-    id("com.dorkbox.Licensing") version "2.19"
-    id("com.dorkbox.VersionUpdate") version "2.5"
-    id("com.dorkbox.GradlePublish") version "1.17"
+    id("com.dorkbox.GradleUtils") version "3.17"
+    id("com.dorkbox.Licensing") version "2.22"
+    id("com.dorkbox.VersionUpdate") version "2.8"
+    id("com.dorkbox.GradlePublish") version "1.18"
 
-    kotlin("jvm") version "1.7.22"
+    kotlin("jvm") version "1.8.0"
 }
 
 object Extras {
@@ -42,16 +35,15 @@ object Extras {
     const val name = "VaadinUndertow"
     const val id = "VaadinUndertow"
 
-    const val version = "14.9.1"
+    const val version = "14.10"
 
     const val vendor = "Dorkbox LLC"
     const val vendorUrl = "https://dorkbox.com"
     const val url = "https://git.dorkbox.com/dorkbox/VaadinUndertow"
 
-    val buildDate = Instant.now().toString()
 
     // These MUST be in lock-step with what the GradleVaadin (other project) + gradle.build.kts + VaadinApplication.kt define, otherwise horrific errors can occur.
-    const val vaadinVer = "14.9.4"
+    const val vaadinVer = "14.10.1"
     const val undertowVer = "2.2.22.Final"
 }
 
@@ -100,7 +92,7 @@ licensing {
 
 dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
 
     compileOnly("com.vaadin:vaadin:${Extras.vaadinVer}")
 
@@ -110,7 +102,7 @@ dependencies {
     api("io.undertow:undertow-websockets-jsr:${Extras.undertowVer}")
 
     // Uber-fast, ultra-lightweight Java classpath and module path scanner
-    api("io.github.classgraph:classgraph:4.8.154")
+    api("io.github.classgraph:classgraph:4.8.160")
 
     api("com.dorkbox:Updates:1.1")
     api("com.dorkbox:FSM:1.0")
@@ -120,11 +112,11 @@ dependencies {
     // awesome logging framework for kotlin.
     // https://www.reddit.com/r/Kotlin/comments/8gbiul/slf4j_loggers_in_3_ways/
     // https://github.com/MicroUtils/kotlin-logging
-    api("io.github.microutils:kotlin-logging:3.0.4")
+    api("io.github.microutils:kotlin-logging:3.0.5")
 
     // 1.8.0-beta4 supports jpms
-    api("org.slf4j:slf4j-api:2.0.5")
-    api("org.slf4j:jul-to-slf4j:2.0.5")
+    api("org.slf4j:slf4j-api:2.0.7")
+    api("org.slf4j:jul-to-slf4j:2.0.7")
 
 
 //    api("ch.qos.logback:logback-core:1.4.5")
@@ -145,7 +137,7 @@ tasks.jar.get().apply {
         attributes["Specification-Vendor"] = Extras.vendor
 
         attributes["Implementation-Title"] = "${Extras.group}.${Extras.id}"
-        attributes["Implementation-Version"] = Extras.buildDate
+        attributes["Implementation-Version"] = GradleUtils.now()
         attributes["Implementation-Vendor"] = Extras.vendor
     }
 }

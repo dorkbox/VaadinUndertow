@@ -64,7 +64,7 @@ class VaadinApplication : ExceptionHandler {
         /**
          * Gets the version number.
          */
-        const val version = "14.9.1"
+        const val version = "14.10"
 
         // this must match the version information in the build.gradle.kts file (this is automatically passed into the plugin)
         const val vaadinVersion = "14.10.1"

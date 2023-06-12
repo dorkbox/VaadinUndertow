@@ -23,7 +23,7 @@ Maven Info
     <dependency>
       <groupId>com.dorkbox</groupId>
       <artifactId>VaadinUndertow</artifactId>
-      <version>14.9.1</version>
+      <version>14.10</version>
     </dependency>
 </dependencies>
 ```
@@ -33,7 +33,7 @@ Gradle Info
 ```
 dependencies {
     ...
-    implementation "com.dorkbox:VaadinUndertow:14.9.1"
+    implementation "com.dorkbox:VaadinUndertow:14.10"
 }
 ````
 
