@@ -374,8 +374,6 @@ class VaadinApplication : ExceptionHandler {
         // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)
         // NOTE: this will load the stats.json file!
 
-        val debug = vaadinConfig.debug
-
         // for our classloader, we have to make sure that we are BY DIRECTORY, not by file, for the resource array!
         val toTypedArray = jarLocations.map { it.resourceDir }.toSet().toTypedArray()
         this.trieClassLoader = TrieClassLoader(diskTrie, jarStringTrie, toTypedArray, this.javaClass.classLoader, logger)
