@@ -93,3 +93,39 @@
              JetBrains s.r.o. and Kotlin Programming Language contributors
            Kotlin Compiler, Test Data+Libraries, and Tools repository contain third-party code, to which different licenses may apply
            See: https://github.com/JetBrains/kotlin/blob/master/license/README.md
+
+     - FiniteStateMachine - Finite State Machine using the AhoCorasick implementation using a Double Array Trie, java 8+
+       [The Apache Software License, Version 2.0]
+       https://git.dorkbox.com/dorkbox/FSM
+       Copyright 2023
+         Dorkbox LLC
+
+       Extra license information
+         - AhoCorasickDoubleArrayTrie - An extremely fast implementation of Aho Corasick algorithm based on Double Array Trie structure.
+           [The Apache Software License, Version 2.0]
+           https://github.com/hankcs/AhoCorasickDoubleArrayTrie
+           Copyright 2018
+             hankcs <me@hankcs.com>
+
+         - Kotlin - 
+           [The Apache Software License, Version 2.0]
+           https://github.com/JetBrains/kotlin
+           Copyright 2020
+             JetBrains s.r.o. and Kotlin Programming Language contributors
+           Kotlin Compiler, Test Data+Libraries, and Tools repository contain third-party code, to which different licenses may apply
+           See: https://github.com/JetBrains/kotlin/blob/master/license/README.md
+
+         - Updates - Software Update Management
+           [The Apache Software License, Version 2.0]
+           https://git.dorkbox.com/dorkbox/Updates
+           Copyright 2021
+             Dorkbox LLC
+
+           Extra license information
+             - Kotlin - 
+               [The Apache Software License, Version 2.0]
+               https://github.com/JetBrains/kotlin
+               Copyright 2020
+                 JetBrains s.r.o. and Kotlin Programming Language contributors
+               Kotlin Compiler, Test Data+Libraries, and Tools repository contain third-party code, to which different licenses may apply
+               See: https://github.com/JetBrains/kotlin/blob/master/license/README.md
