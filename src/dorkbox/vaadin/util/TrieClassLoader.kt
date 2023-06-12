@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package dorkbox.vaadin.util
 
-import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
+import dorkbox.fsm.DoubleArrayStringTrie
 import mu.KLogger
 import java.net.URL
 import java.net.URLClassLoader
@@ -24,8 +24,8 @@ import java.net.URLClassLoader
  *
  */
 class TrieClassLoader(
-    private val urlTrie: DoubleArrayTrie<URL>,
-    private val stringTrie: DoubleArrayTrie<String>,
+    private val urlTrie: DoubleArrayStringTrie<URL>,
+    private val stringTrie: DoubleArrayStringTrie<String>,
     urls: Array<URL>, parent: ClassLoader,
     private val logger: KLogger): URLClassLoader(urls, parent) {
 

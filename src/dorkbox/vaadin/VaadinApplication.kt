@@ -17,12 +17,12 @@ package dorkbox.vaadin
 
 import com.vaadin.flow.server.VaadinContext
 import com.vaadin.flow.server.frontend.FrontendUtils
+import dorkbox.fsm.DoubleArrayStringTrie
 import dorkbox.vaadin.undertow.*
 import dorkbox.vaadin.util.CallingClass
 import dorkbox.vaadin.util.TrieClassLoader
 import dorkbox.vaadin.util.UndertowBuilder
 import dorkbox.vaadin.util.VaadinConfig
-import dorkbox.vaadin.util.ahoCorasick.DoubleArrayTrie
 import io.github.classgraph.ClassGraph
 import io.github.classgraph.ScanResult
 import io.undertow.Undertow
@@ -109,9 +109,9 @@ class VaadinApplication : ExceptionHandler {
     private lateinit var servletHttpHandler: HttpHandler
     private lateinit var servletManager: DeploymentManager
 
-    private lateinit var jarStringTrie: DoubleArrayTrie<String>
-    private lateinit var jarUrlTrie: DoubleArrayTrie<URL>
-    private lateinit var diskTrie: DoubleArrayTrie<URL>
+    private lateinit var jarStringTrie: DoubleArrayStringTrie<String>
+    private lateinit var jarUrlTrie: DoubleArrayStringTrie<URL>
+    private lateinit var diskTrie: DoubleArrayStringTrie<URL>
 
     private lateinit var servletBuilder: DeploymentInfo
     private lateinit var serverBuilder: UndertowBuilder
@@ -366,9 +366,9 @@ class VaadinApplication : ExceptionHandler {
         }
 
         // EVERYTHING IS ACCESSED VIA TRIE, NOT VIA HASHMAP! (it's faster this way)
-        jarStringTrie = DoubleArrayTrie(jarStringResourceRequestMap)
-        jarUrlTrie = DoubleArrayTrie(jarUrlResourceRequestMap)
-        diskTrie = DoubleArrayTrie(diskResourceRequestMap)
+        jarStringTrie = DoubleArrayStringTrie(jarStringResourceRequestMap)
+        jarUrlTrie = DoubleArrayStringTrie(jarUrlResourceRequestMap)
+        diskTrie = DoubleArrayStringTrie(diskResourceRequestMap)
 
 
         // so we can use the undertow cache to serve resources, instead of the vaadin servlet (which doesn't cache, and is really slow)

@@ -113,6 +113,7 @@ dependencies {
     api("io.github.classgraph:classgraph:4.8.154")
 
     api("com.dorkbox:Updates:1.1")
+    api("com.dorkbox:FSM:1.0")
 
 //    implementation("com.conversantmedia:disruptor:1.2.19")
 
