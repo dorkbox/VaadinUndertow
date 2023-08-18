@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2023 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,14 @@ package dorkbox.vaadin.util
 import io.undertow.Undertow
 import io.undertow.Undertow.ListenerBuilder
 import io.undertow.connector.ByteBufferPool
+import io.undertow.security.api.AuthenticationMechanism
+import io.undertow.security.api.AuthenticationMode
+import io.undertow.security.handlers.AuthenticationCallHandler
+import io.undertow.security.handlers.AuthenticationConstraintHandler
+import io.undertow.security.handlers.AuthenticationMechanismsHandler
+import io.undertow.security.handlers.SecurityInitialHandler
+import io.undertow.security.idm.IdentityManager
+import io.undertow.security.impl.BasicAuthenticationMechanism
 import io.undertow.server.HttpHandler
 import org.xnio.Option
 import org.xnio.XnioWorker
@@ -28,6 +36,20 @@ import javax.net.ssl.TrustManager
 
 @Suppress("unused")
 class UndertowBuilder() {
+    companion object {
+        fun addSecurity(toWrap: HttpHandler, identityManager: IdentityManager): HttpHandler {
+            var handler = toWrap
+            handler = AuthenticationCallHandler(handler)
+            handler = AuthenticationConstraintHandler(handler)
+
+            val mechanisms = listOf<AuthenticationMechanism>(BasicAuthenticationMechanism("My Realm"))
+            handler = AuthenticationMechanismsHandler(handler, mechanisms)
+            handler = SecurityInitialHandler(AuthenticationMode.PRO_ACTIVE, identityManager, handler)
+
+            return handler
+        }
+    }
+
     private val builder = Undertow.builder()
 
     // the LAST http (or https) listener will recorded as the listener used.
