@@ -22,7 +22,7 @@
 
 plugins {
     id("com.dorkbox.GradleUtils") version "3.17"
-    id("com.dorkbox.Licensing") version "2.22"
+    id("com.dorkbox.Licensing") version "2.26"
     id("com.dorkbox.VersionUpdate") version "2.8"
     id("com.dorkbox.GradlePublish") version "1.18"
 

@@ -79,6 +79,13 @@
        Copyright 2023
          Vaadin Ltd.
 
+     - Jakarta Servlet  - Jakarta Servlet™ is a standard technology for interacting with the web on the Jakarta EE platform. 
+       [GNU General Public License, version 2, with the Classpath Exception]
+       https://projects.eclipse.org/projects/ee4j.servlet 
+       Copyright 2023
+         Yamini K B
+         ee4j-pmc@eclipse.org
+
      - Updates - Software Update Management
        [The Apache Software License, Version 2.0]
        https://git.dorkbox.com/dorkbox/Updates
