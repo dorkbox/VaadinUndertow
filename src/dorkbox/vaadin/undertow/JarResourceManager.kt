@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 dorkbox, llc
+ * Copyright 2024 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
 import io.undertow.server.handlers.resource.URLResource
-import mu.KLogger
+import org.slf4j.Logger
 import java.io.IOException
 import java.net.URL
 
@@ -48,20 +48,25 @@ import java.net.URL
  * @author Andy Wilkinson
  * @author Dorkbox LLC
  */
-internal class JarResourceManager(val name: String, val trie: DoubleArrayStringTrie<URL>, val logger: KLogger) : ResourceManager {
+internal class JarResourceManager(val name: String,
+                                  private val trie: DoubleArrayStringTrie<URL>,
+                                  private val logger: Logger) : ResourceManager {
 
     @Throws(IOException::class)
     override fun getResource(path: String): Resource? {
-        logger.trace { "REQUEST jar: $path" }
-
-        val url = trie[path] ?: return null
-        logger.trace { "TRIE: $url" }
-
-        val resource = URLResource(url, path)
-        if (path.isNotBlank() && path != "/" && resource.contentLength < 0) {
+        val url = trie[path]
+        if (url === null) {
+            logger.trace("REQUEST not found for PATH: {}", path)
             return null
         }
 
+        val resource = URLResource(url, path)
+        if (path.isNotBlank() && path != "/" && resource.contentLength < 0) {
+            logger.trace("REQUEST file not found for PATH: {}, {}", path, url)
+            return null
+        }
+
+        logger.debug("REQUEST found: {}, {}", path, url)
         return resource
     }
 

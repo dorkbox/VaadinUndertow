@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Dorkbox LLC
+ * Copyright 2024 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,14 @@
 
 package dorkbox.vaadin.undertow
 
+import dorkbox.vaadin.util.logger
 import io.undertow.UndertowMessages
 import io.undertow.server.handlers.resource.Resource
 import io.undertow.server.handlers.resource.ResourceChangeListener
 import io.undertow.server.handlers.resource.ResourceManager
-import mu.KotlinLogging
 
 class ResourceCollectionManager(private val resources: List<ResourceManager>) : ResourceManager {
-    private val logger = KotlinLogging.logger {}
+    private val logger = logger()
 
     private val changeListenerSupported : Boolean by lazy {
         var supported = true
@@ -77,7 +77,7 @@ class ResourceCollectionManager(private val resources: List<ResourceManager>) : 
             try {
                 it.close()
             } catch (e: Exception) {
-                logger.error(e) { "Error closing resourceManager" }
+                logger.error("Error closing resourceManager", e)
             }
         }
     }

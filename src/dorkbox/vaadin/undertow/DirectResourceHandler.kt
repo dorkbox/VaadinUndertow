@@ -18,6 +18,7 @@
 
 package dorkbox.vaadin.undertow
 
+import dorkbox.vaadin.util.logger
 import io.undertow.UndertowLogger
 import io.undertow.io.IoCallback
 import io.undertow.predicate.Predicate
@@ -31,12 +32,12 @@ import io.undertow.server.handlers.cache.ResponseCache
 import io.undertow.server.handlers.encoding.ContentEncodedResourceManager
 import io.undertow.server.handlers.resource.*
 import io.undertow.util.*
+import org.slf4j.Logger
 import java.io.File
 import java.io.IOException
 import java.nio.file.Paths
 import java.util.*
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 
 @Suppress("unused")
 /**
@@ -49,6 +50,7 @@ import java.util.concurrent.TimeUnit
  */
 class DirectResourceHandler(@Volatile private var resourceManager: ResourceManager?,
                             @Volatile private var resourceSupplier: ResourceSupplier = DefaultResourceSupplier(resourceManager),
+                            val logger: Logger,
                             private val next: HttpHandler = ResponseCodeHandler.HANDLE_404) : HttpHandler {
 
     private val welcomeFiles = CopyOnWriteArrayList(arrayOf("index.html", "index.htm", "default.html", "default.htm"))
@@ -451,12 +453,13 @@ class DirectResourceHandler(@Volatile private var resourceManager: ResourceManag
 
     }
 
-    private class Wrapper internal constructor(private val location: String,
-                                               private val allowDirectoryListing: Boolean) : HandlerWrapper {
+    private class Wrapper(private val location: String,
+                          private val allowDirectoryListing: Boolean) : HandlerWrapper {
 
         override fun wrap(handler: HttpHandler): HttpHandler {
-            val rm = PathResourceManager(Paths.get(location), 1024)
-            val resourceHandler = DirectResourceHandler(rm)
+            val resourceManager = PathResourceManager(Paths.get(location), 1024)
+            // use a default logger
+            val resourceHandler = DirectResourceHandler(resourceManager, DefaultResourceSupplier(resourceManager), logger())
             resourceHandler.setDirectoryListingEnabled(allowDirectoryListing)
             return resourceHandler
         }
