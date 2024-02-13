@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2024 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package dorkbox.vaadin.util
 
 /**
- *
+ * This class is overridden by the multi-source compile for java 9+
  */
 object CallingClass {
     fun get(): Class<*> {
