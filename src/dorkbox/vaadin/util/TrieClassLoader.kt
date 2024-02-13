@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 dorkbox, llc
+ * Copyright 2024 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,32 +16,38 @@
 package dorkbox.vaadin.util
 
 import dorkbox.fsm.DoubleArrayStringTrie
-import mu.KLogger
+import org.slf4j.Logger
 import java.net.URL
 import java.net.URLClassLoader
 
 /**
- *
+ * Used to get classloader data, but using a trie to store the lookups
  */
 class TrieClassLoader(
-    private val urlTrie: DoubleArrayStringTrie<URL>,
-    private val stringTrie: DoubleArrayStringTrie<String>,
-    urls: Array<URL>, parent: ClassLoader,
-    private val logger: KLogger): URLClassLoader(urls, parent) {
+    private val diskTrie: DoubleArrayStringTrie<URL>,
+    private val jarTrie: DoubleArrayStringTrie<String>,
+
+    jarResourceDirs: Array<URL>, parentClassloader: ClassLoader,
+
+    private val logger: Logger,
+    private val loggerDisk: Logger,
+    private val loggerJar: Logger,
+
+    ): URLClassLoader(jarResourceDirs, parentClassloader) {
 
     override fun getResource(name: String): URL? {
-        logger.trace { "URL Classloader: $name" }
+        logger.trace(name)
 
         // check disk first
-        val diskResourcePath: URL? = urlTrie[name]
+        val diskResourcePath: URL? = diskTrie[name]
         if (diskResourcePath != null) {
-            logger.trace { "TRIE: $diskResourcePath" }
+            loggerDisk.trace(diskResourcePath.file)
             return diskResourcePath
         }
 
-        val jarResourcePath: String? = stringTrie[name]
+        val jarResourcePath: String? = jarTrie[name]
         if (jarResourcePath != null) {
-            logger.trace { "TRIE: $jarResourcePath" }
+            loggerJar.trace(jarResourcePath)
             return super.getResource(jarResourcePath)
         }
 
