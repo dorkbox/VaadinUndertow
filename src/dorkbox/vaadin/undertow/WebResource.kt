@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 dorkbox, llc
+ * Copyright 2024 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,4 +17,22 @@ package dorkbox.vaadin.undertow
 
 import java.net.URL
 
-data class WebResource(val requestPath: String, val resourcePath: URL)
+// stored in a set, and URL.toString() can cause a DNS lookup!
+data class WebResource(val requestPath: String, val resourcePath: URL) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is WebResource) return false
+
+        if (requestPath != other.requestPath) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return requestPath.hashCode()
+    }
+
+    override fun toString(): String {
+        return "WebResource(requestPath='$requestPath')"
+    }
+}
